@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
-import { SOURCE, RSS_URL, SCHEMA_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
+import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
 
 const NOW=Date.parse('2026-10-04T10:00:00Z');
 const url=id=>`${SOURCE}/video/${id}/test`;
 const item=id=>({id:`video:${id}`,videoId:String(id),sourceUrl:url(id),title:`Test ${id}`,categories:[]});
 const rss=(id=201)=>`<rss><channel><item><title>Test &amp; sample</title><link>${url(id)}</link><pubDate>Sun, 04 Oct 2026 09:00:00 GMT</pubDate></item></channel></rss>`;
 const listing=(id,next=2)=>`<h4>Videos Being Watched</h4><a href="${url(999)}">Not an archive</a><h4><span>Most Recent Videos</span></h4><div><a href="${url(id)}"><img src="https://cdn.tokyo-motion.net/${id}.jpg" alt="Test ${id}"><span>HD</span><span>01:20</span></a><a href="${url(id)}">Test ${id}</a><span>2 days ago</span><span>1,234 views</span><span>88%</span></div>${next?`<a href="/page=${next}">Next</a>`:''}<h4>Information</h4>`;
-const detail=(id=201,likes=12,dislikes=3)=>`<meta content="Test ${id}" property="og:title"><meta content="https://cdn.tokyo-motion.net/${id}.jpg" property="og:image"><script>let fake='123000 views';</script><div class="dislike" style="width:88%"></div><h4>Test ${id}</h4><span>${likes}</span><span>${dislikes}</span><a>Embed Video</a><textarea>&lt;iframe src="https://www.tokyomotion.net/embed/abc123"&gt;</textarea><p>Uploader · 2 days ago, 1,234 views</p><h4>Related Videos</h4><p>1 day ago, 999999 views</p>`;
+const detail=(id=201,likes=12,dislikes=3)=>`<meta content="Test ${id}" property="og:title"><meta content="https://cdn.tokyo-motion.net/${id}.jpg" property="og:image"><script>let fake='123000 views';</script><div class="dislike" style="width:88%"></div><h4>Test ${id}</h4><div class="vote-msg"><span id="video_likes" class="text-white">${likes}</span><span id="video_dislikes" class="text-white">${dislikes}</span></div><a>Share</a><a>Flag</a><a>Favorite</a><a>Embed</a><div>Embed Video</div><textarea>&lt;iframe src="https://www.tokyomotion.net/embed/abc123"&gt;</textarea><p>Uploader · 2 days ago, 1,234 views</p><h4>Related Videos</h4><p>1 day ago, 999999 views</p>`;
 
 test('entity decoding and script removal do not invent visible metadata',()=>{
   assert.equal(decode('A&#x26;B &amp; &#39;'),'A&B & \'');
@@ -30,11 +30,15 @@ test('detail reads votes and main view count, not CSS percent or related views',
   const x=parseDetail(detail(),NOW);assert.equal(x.likes,12);assert.equal(x.dislikes,3);assert.equal(x.views,1234);assert.equal(x.title,'Test 201');
 });
 test('unknown ratings stay null, not percent-derived vote counts',()=>{
-  const html=detail().replace('<span>12</span><span>3</span>','<span>Not available</span>');
+  const html=detail().replace(/<span id="video_(?:dis)?likes"[^>]*>[^<]*<\/span>/g,'<span>Not available</span>');
   const x=parseDetail(html,NOW);assert.equal(x.likes,null);assert.equal(x.dislikes,null);
 });
 test('zero ratings remain valid zero',()=>{
   const x=parseDetail(detail(201,0,0),NOW);assert.equal(x.likes,0);assert.equal(x.dislikes,0);
+});
+test('actual vote controls accept thousands and ignore nearby fake counts',()=>{
+  const html=detail(201,'1,234','6').replace('<div>Embed Video</div>','<span>999</span><span>999</span><div>Embed Video</div>');
+  const x=parseDetail(html,NOW);assert.equal(x.likes,1234);assert.equal(x.dislikes,6);assert.equal(x.ratingVersion,RATING_VERSION);assert.ok(x.ratingPercent>99);
 });
 test('private works lose the official embed instead of bypassing restrictions',()=>{
   const x=parseDetail('<h1>This is a private video</h1>',NOW);assert.equal(x.availability,'unavailable');assert.equal(x.embedUrl,'');
@@ -50,8 +54,11 @@ test('numeric ID merges URL spelling variants and keeps exact dates',()=>{
   assert.equal(x.date,NOW);assert.equal(x.dateSource,'rss');
 });
 test('complete metadata is periodically refreshed',()=>{
-  const x={...item(1),statsVersion:SCHEMA_VERSION,detailCheckedAt:new Date(NOW-25*3600000).toISOString()};assert.equal(detailQueue([x],NOW).length,1);
+  const x={...item(1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(NOW-25*3600000).toISOString()};assert.equal(detailQueue([x],NOW).length,1);
   assert.equal(detailQueue([{...x,detailCheckedAt:new Date(NOW).toISOString()}],NOW).length,0);
+});
+test('previous parser versions are re-audited even when recently checked',()=>{
+  assert.equal(detailQueue([{...item(1),statsVersion:SCHEMA_VERSION,detailCheckedAt:new Date(NOW).toISOString()}],NOW).length,1);
 });
 const mockSource=async requested=>{
   if(requested===RSS_URL)return rss();
@@ -61,7 +68,7 @@ const mockSource=async requested=>{
   return detail(Number(requested.match(/\/video\/(\d+)/)?.[1]||1));
 };
 test('100 existing works do not suppress incoming works; archive resumes across runs',async()=>{
-  const previous={items:Array.from({length:100},(_,i)=>({...item(i+1),statsVersion:SCHEMA_VERSION,detailCheckedAt:new Date(NOW).toISOString()}))};
+  const previous={items:Array.from({length:100},(_,i)=>({...item(i+1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(NOW).toISOString()}))};
   const result=await updateCatalog(previous,{getText:mockSource,now:NOW,delayMs:0,detailLimit:5});
   assert.ok(result.items.length>100);assert.ok(result.items.some(x=>x.videoId==='201'));assert.ok(result.items.some(x=>x.videoId==='1'));
   assert.equal(result.backfill.nextPage,5);assert.equal(result.summary.detailRefreshed,5);
@@ -76,6 +83,12 @@ test('complete source failure does not erase the previous catalog',async()=>{
   const previous={items:[item(1)]};let calls=0;
   await assert.rejects(()=>updateCatalog(previous,{getText:async()=>{calls++;const error=new Error('HTTP_403');error.status=403;throw error},now:NOW,delayMs:0}),/previous catalog preserved/);
   assert.equal(previous.items.length,1);assert.equal(calls,1);
+});
+test('404 keeps the catalog entry, removes stale embed and defers recheck',async()=>{
+  const result=await updateCatalog({items:[{...item(9999),embedUrl:`${SOURCE}/embed/old`}]},{getText:async u=>{
+    if(u===url(9999)){const error=new Error('HTTP_404');error.status=404;throw error}return mockSource(u);
+  },now:NOW,delayMs:0});
+  const x=result.items.find(x=>x.videoId==='9999');assert.equal(x.availability,'not_found');assert.equal(x.embedUrl,'');assert.equal(x.lastError,'HTTP_404');assert.equal(detailQueue([x],NOW).length,0);
 });
 
 test('UI syntax, safe storage, honest missing-stat labels and age gate removal',async()=>{

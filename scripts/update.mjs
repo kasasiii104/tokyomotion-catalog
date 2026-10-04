@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
 export const SCHEMA_VERSION = 2;
+export const RATING_VERSION = 1;
 const OUTPUT = new URL("../data/videos.json", import.meta.url);
 const HOUR = 3600000;
 
@@ -129,12 +130,18 @@ export function parseListing(html,pageUrl,now=Date.now()) {
 export function parseDetail(html,now=Date.now()) {
   const text=stripMarkup(html);
   if(/This is a private video|video (?:has been|was) (?:removed|deleted)|video (?:does not exist|not found)/i.test(text)) {
-    return {availability:"unavailable",embedUrl:"",likes:null,dislikes:null,detailCheckedAt:new Date(now).toISOString(),statsVersion:SCHEMA_VERSION};
+    return {availability:"unavailable",embedUrl:"",likes:null,dislikes:null,ratingPercent:null,detailCheckedAt:new Date(now).toISOString(),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION};
   }
   const embed=embedUrl(html),marker=text.indexOf("Embed Video");
   if(!embed||marker<0)throw new Error("detail_unavailable_or_structure_changed");
-  // Never read votes from CSS widths, scripts, or a "dislike" substring.
-  const votes=text.slice(0,marker).match(/(?:^|\s)([\d,]+)\s+([\d,]+)\s*$/);
+  // Read the actual counters, not CSS widths or numbers near sharing controls.
+  const spans=[...html.replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi,"").matchAll(/<span\b[^>]*>([\s\S]*?)<\/span>/gi)];
+  const counter=id=>{
+    const span=spans.find(x=>attr(x[0].match(/^<span\b[^>]*>/i)?.[0]||"","id")===id);
+    const value=span?stripMarkup(span[1]):"";
+    return /^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(value)?Number(value.replace(/,/g,"")):null;
+  };
+  const likes=counter("video_likes"),dislikes=counter("video_dislikes");
   // The uploader line identifies the main work's count, not a related card.
   const info=text.slice(marker).split(/Related Videos|Comments/)[0];
   const viewMatch=info.match(/\b(?:\d+\s+(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\s*,\s*([\d,]+)\s+views\b/i);
@@ -143,9 +150,9 @@ export function parseDetail(html,now=Date.now()) {
   const date=Number.isFinite(exact)?exact:relative;
   return {title:meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,""),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
     embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
-    likes:votes?Number(votes[1].replace(/,/g,"")):null,dislikes:votes?Number(votes[2].replace(/,/g,"")):null,
+    likes,dislikes,ratingPercent:likes!=null&&dislikes!=null&&likes+dislikes>0?100*likes/(likes+dislikes):null,
     date,dateSource:Number.isFinite(exact)?"official":date?"relative":"unknown",dateLabel:dateLabel(date),
-    statsVersion:SCHEMA_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:null};
+    statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:null};
 }
 
 export function migrateItems(data) {
@@ -164,7 +171,7 @@ export function mergeItems(...lists) {
     if(!key)continue;
     const old=map.get(key),result={...old,...item,id:old?.id||item.id||`video:${key}`,videoId:key,sourceUrl:url,
       categories:[...new Set([...(old?.categories||[]),...(item.categories||[])])]};
-    for(const field of ["title","image","embedUrl"])if(!item[field] && old?.[field] && item.availability!=="unavailable")result[field]=old[field];
+    for(const field of ["title","image","embedUrl"])if(!item[field] && old?.[field] && !["unavailable","not_found"].includes(item.availability))result[field]=old[field];
     if(old?.date && (!item.date||(dateRank[old.dateSource]||0)>=(dateRank[item.dateSource]||0))) {
       result.date=old.date;result.dateSource=old.dateSource;result.dateLabel=old.dateLabel;
     }
@@ -177,7 +184,7 @@ export function mergeItems(...lists) {
 }
 
 export function detailQueue(items,now,limit=100) {
-  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
+  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
   const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>Number(b.videoId)-Number(a.videoId));
   const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
   const selected=[...pending.slice(0,Math.max(1,Math.floor(limit*.65))),...refresh.slice(0,Math.max(1,Math.floor(limit*.35)))];
@@ -226,28 +233,20 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   for(const item of queue) {
     if(accessBlocked)break;
     try {
-      const html=await request(item.sourceUrl);
-      const detail=parseDetail(html,now);
-      if(!details.length && detail.likes==null) {
-        // Temporary structural diagnostic: no titles, URLs, scripts or media.
-        const position=html.indexOf("Embed Video");
-        const window=html.slice(Math.max(0,position-7500),position+200).replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi,"");
-        const shape=(window.match(/<[^>]*>|[^<]+/g)||[]).map(part=>{
-          if(part.startsWith("<"))return part.match(/^<\/?[a-z0-9]+/i)?.[0]+["id","class"].map(name=>{const value=attr(part,name);return value?` ${name}="${value.replace(/[^\w -]/g,"").slice(0,100)}"`:""}).join("")+">";
-          return part.replace(/[^\d\s%.,+-]/g,"_").replace(/_+/g,"_").replace(/\s+/g," ");
-        }).join("");
-        console.log(JSON.stringify({diagnostic:"vote_structure",shape}));
-      }
+      const detail=parseDetail(await request(item.sourceUrl),now);
       const keepDate=item.dateSource==="rss"&&detail.dateSource!=="official";
       details.push({...item,...detail,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
-    }catch(error){errors.push({stage:"detail",videoId:item.videoId,reason:error.message});}
+    }catch(error){
+      errors.push({stage:"detail",videoId:item.videoId,reason:error.message});
+      if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
+    }
   }
   items=mergeItems(items,details).map(item=>({...item,categories:item.categories||[]}));
   items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
   return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,
     summary:{total:items.length,newItems:items.length-new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl))).size,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
-      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt).length,withImages:items.filter(x=>x.image).length,
+      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION).length,withImages:items.filter(x=>x.image).length,
       withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
 }
 
