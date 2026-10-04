@@ -35,6 +35,12 @@ function normalizeUrl(value, base = SOURCE) {
   }
 }
 
+function videoKey(value) {
+  const url = normalizeUrl(value);
+  const match = url.match(/\/video\/(\d+)/i);
+  return match ? `video:${match[1]}` : url;
+}
+
 function stripMarkup(value = "") {
   return decode(value)
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -106,15 +112,16 @@ function parseDetailDate(html) {
 }
 
 function parseDetailStats(html) {
-  const viewMatch = html.match(/([\d,]+)\s*views?\b/i);
+  const clean = stripMarkup(html);
+  const viewMatch = clean.match(/([\d,]+)\s*views?\b/i);
   const views = viewMatch ? Number(viewMatch[1].replace(/,/g, "")) : null;
-  const marker = html.search(/Embed\s+Video/i);
-  const section = marker >= 0 ? html.slice(Math.max(0, marker - 7000), marker) : html.slice(0, 7000);
+  const marker = clean.search(/Embed\s+Video/i);
+  const section = marker >= 0 ? clean.slice(Math.max(0, marker - 7000), marker) : clean.slice(0, 7000);
+  const pair = clean.match(/(?:^|\s)([\d,]+)\s+([\d,]+)\s+Embed\s+Video\b/i);
   const likeMatch = section.match(/(?:like|upvote|positive)[^\d]{0,120}([\d,]+)/i);
   const dislikeMatch = section.match(/(?:dislike|downvote|negative)[^\d]{0,120}([\d,]+)/i);
-  const numbers = [...section.matchAll(/>\s*([0-9][0-9,]*)\s*</g)].map((match) => Number(match[1].replace(/,/g, ""))).filter(Number.isFinite);
-  const likes = likeMatch ? Number(likeMatch[1].replace(/,/g, "")) : numbers.length >= 2 ? numbers.at(-2) : null;
-  const dislikes = dislikeMatch ? Number(dislikeMatch[1].replace(/,/g, "")) : numbers.length >= 2 ? numbers.at(-1) : null;
+  const likes = pair ? Number(pair[1].replace(/,/g, "")) : likeMatch ? Number(likeMatch[1].replace(/,/g, "")) : null;
+  const dislikes = pair ? Number(pair[2].replace(/,/g, "")) : dislikeMatch ? Number(dislikeMatch[1].replace(/,/g, "")) : null;
   return { views: Number.isFinite(views) ? views : null, likes: Number.isFinite(likes) ? likes : null, dislikes: Number.isFinite(dislikes) ? dislikes : null };
 }
 
@@ -122,14 +129,15 @@ function mergeItems(...lists) {
   const map = new Map();
   for (const item of lists.flat()) {
     const sourceUrl = normalizeUrl(item.sourceUrl || item.id);
-    if (!sourceUrl || !/^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(sourceUrl)) continue;
-    const previous = map.get(sourceUrl);
+    const key = videoKey(sourceUrl);
+    if (!sourceUrl || !/^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(sourceUrl) || !key) continue;
+    const previous = map.get(key);
     if (!previous) {
-      map.set(sourceUrl, { ...item, id: item.id || sourceUrl, sourceUrl, categories: [...new Set(item.categories || [])] });
+      map.set(key, { ...item, id: item.id || sourceUrl, sourceUrl, categories: [...new Set(item.categories || [])] });
       continue;
     }
     const date = item.date || previous.date || 0;
-    map.set(sourceUrl, {
+    map.set(key, {
       ...previous,
       ...item,
       id: previous.id || item.id || sourceUrl,
