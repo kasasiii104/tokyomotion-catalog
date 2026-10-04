@@ -231,7 +231,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
       if(!details.length && detail.likes==null) {
         // Temporary structural diagnostic: no titles, URLs, scripts or media.
         const position=html.indexOf("Embed Video");
-        const window=html.slice(Math.max(0,position-2500),position+200).replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi,"");
+        const window=html.slice(Math.max(0,position-7500),position+200).replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi,"");
         const shape=(window.match(/<[^>]*>|[^<]+/g)||[]).map(part=>{
           if(part.startsWith("<"))return part.match(/^<\/?[a-z0-9]+/i)?.[0]+["id","class"].map(name=>{const value=attr(part,name);return value?` ${name}="${value.replace(/[^\w -]/g,"").slice(0,100)}"`:""}).join("")+">";
           return part.replace(/[^\d\s%.,+-]/g,"_").replace(/_+/g,"_").replace(/\s+/g," ");
