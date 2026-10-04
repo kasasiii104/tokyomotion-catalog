@@ -1,6 +1,6 @@
 # TokyoMotion Catalog
 
-TokyoMotionのRSSから作品情報と公式埋め込みURLだけを取得し、GitHub Pagesで一覧表示するカタログです。動画ファイルは保存・コピー・中継しません。サムネイルをタップしたときだけ、TokyoMotion公式の埋め込みプレイヤーを表示します。
+TokyoMotionのRSSと公式の一覧ページ（先頭8ページ、最大100件）から作品情報・サムネイル・再生数・評価・公式埋め込みURLを取得し、GitHub Pagesで一覧表示するカタログです。動画ファイルは保存・コピー・中継しません。サムネイルをタップしたときだけ、TokyoMotion公式の埋め込みプレイヤーを表示します。
 
 ## 初回設定
 
@@ -8,7 +8,7 @@ TokyoMotionのRSSから作品情報と公式埋め込みURLだけを取得し、
 2. **Actions** から `Update TokyoMotion catalog` を一度手動実行する
 3. `Deploy TokyoMotion catalog` が完了するとPagesに反映される
 
-その後は30分ごとにRSSを読み込み、`data/videos.json` が変わったときだけ更新します。
+その後は30分ごとにRSSと過去ページを読み込み、`data/videos.json`を更新します。公式ページ側で削除・非公開になった作品は再生できません。
 
 ## 注意
 
