@@ -37,7 +37,8 @@ function parseFeed(xml) {
     const rawDate = textTag(block, "pubDate") || textTag(block, "date") || textTag(block, "published");
     const date = rawDate ? Date.parse(rawDate) : 0;
     const id = textTag(block, "guid") || sourceUrl || `${title}-${index}`;
-    return { id, title, sourceUrl, image, embedUrl: embedMatch ? embedMatch[0] : "", categories, date: Number.isFinite(date) ? date : 0 };
+    const timestamp = Number.isFinite(date) ? date : 0;
+    return { id, title, sourceUrl, image, embedUrl: embedMatch ? embedMatch[0] : "", categories, date: timestamp, dateLabel: timestamp ? new Date(timestamp).toLocaleDateString("ja-JP") : "日付不明" };
   }).filter((item) => item.sourceUrl && /^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(item.sourceUrl));
 }
 
