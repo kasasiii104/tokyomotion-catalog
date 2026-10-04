@@ -1,224 +1,253 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
-const SOURCE = "https://www.tokyomotion.net";
-const RSS_URL = `${SOURCE}/rss`;
+export const SOURCE = "https://www.tokyomotion.net";
+export const RSS_URL = `${SOURCE}/rss`;
+export const SCHEMA_VERSION = 2;
 const OUTPUT = new URL("../data/videos.json", import.meta.url);
-const LISTING_PAGES = Number(process.env.TM_LISTING_PAGES || 8);
-const MAX_ITEMS = Number(process.env.TM_MAX_ITEMS || 100);
+const HOUR = 3600000;
 
-function decode(value = "") {
-  return String(value)
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)));
+export function decode(value = "") {
+  return String(value).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
+    .replace(/&#(x[\da-f]+|\d+);/gi, (all,n) => {
+      const code=n[0].toLowerCase()==="x" ? parseInt(n.slice(1),16) : Number(n);
+      return code>0 && code<=0x10ffff ? String.fromCodePoint(code) : all;
+    })
+    .replace(/&(?:amp|lt|gt|quot|apos|nbsp);/gi, x=>({"&amp;":"&","&lt;":"<","&gt;":">","&quot;":'"',"&apos;":"'","&nbsp;":" "})[x.toLowerCase()]);
 }
 
-function textTag(block, name) {
-  const re = new RegExp(`<(?:[\\w.-]+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w.-]+:)?${name}>`, "i");
-  const match = block.match(re);
-  return match ? decode(match[1]).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() : "";
+export function stripMarkup(value = "") {
+  return decode(String(value).replace(/<!--[\s\S]*?-->/g," ")
+    .replace(/<(script|style|textarea)\b[^>]*>[\s\S]*?<\/\1>/gi," ")
+    .replace(/<[^>]+>/g," ")).replace(/\s+/g," ").trim();
 }
 
-function attrTag(block, name) {
-  const re = new RegExp(`<(?:(?:[\\w.-]+):)?${name}\\b[^>]*(?:url|href)=["']([^"']+)`, "i");
-  const match = block.match(re);
-  return match ? decode(match[1]) : "";
+function attr(tag,name) {
+  return decode(tag.match(new RegExp(`(?:^|\\s)${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`,"i"))?.slice(1).find(x=>x!==undefined)||"");
 }
 
-function normalizeUrl(value, base = SOURCE) {
+function meta(html,name) {
+  for(const tag of html.match(/<meta\b[^>]*>/gi)||[]) {
+    if([attr(tag,"property"),attr(tag,"name"),attr(tag,"itemprop")].includes(name))return attr(tag,"content");
+  }
+  return "";
+}
+
+export function normalizeUrl(value,base=SOURCE) {
+  if(!value)return "";
   try {
-    const url = new URL(decode(value), base);
-    return /^https?:$/i.test(url.protocol) ? url.href : "";
-  } catch (_) {
-    return "";
+    const url=new URL(decode(value),base);
+    return ["http:","https:"].includes(url.protocol) && !url.username && !url.password ? url.href : "";
+  } catch{return "";}
+}
+
+export function videoKey(value) {
+  return normalizeUrl(value).match(/^https?:\/\/(?:www\.)?tokyomotion\.net\/video\/(\d+)(?:\/|$)/i)?.[1]||"";
+}
+
+function sourceUrl(value) {
+  const url=normalizeUrl(value);
+  if(!videoKey(url))return "";
+  const parsed=new URL(url);
+  parsed.protocol="https:";parsed.hostname="www.tokyomotion.net";parsed.search="";parsed.hash="";
+  return parsed.href;
+}
+
+function imageUrl(value,base=SOURCE) {
+  const url=normalizeUrl(value,base);
+  return url && /(^|\.)(?:tokyomotion|tokyo-motion)\.net$/i.test(new URL(url).hostname) ? url.replace(/^http:/,"https:") : "";
+}
+
+function embedUrl(html) {
+  return decode(html).match(/https?:\/\/(?:www\.)?tokyomotion\.net\/embed\/[A-Za-z0-9_-]+/i)?.[0]?.replace(/^http:/,"https:")||"";
+}
+
+function dateLabel(date) {
+  return date ? new Date(date).toLocaleDateString("ja-JP",{timeZone:"Asia/Tokyo"}) : "日付不明";
+}
+
+function tagText(block,name) {
+  const value=block.match(new RegExp(`<(?:[\\w.-]+:)?${name}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[\\w.-]+:)?${name}>`,"i"))?.[1]||"";
+  return stripMarkup(decode(value));
+}
+
+export function parseFeed(xml) {
+  return (xml.match(/<item\b[\s\S]*?<\/item>/gi)||[]).flatMap(block=>{
+    const url=sourceUrl(tagText(block,"link")||tagText(block,"guid"));
+    if(!url)return [];
+    const parsedDate=Date.parse(tagText(block,"pubDate")||tagText(block,"published"));
+    const date=Number.isFinite(parsedDate)?parsedDate:0;
+    const imageTag=block.match(/<(?:media:thumbnail|enclosure)\b[^>]*>/i)?.[0]||"";
+    return [{id:`video:${videoKey(url)}`,videoId:videoKey(url),sourceUrl:url,title:tagText(block,"title"),
+      image:imageUrl(attr(imageTag,"url")),embedUrl:embedUrl(block),
+      categories:[...block.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/gi)].map(x=>stripMarkup(decode(x[1]))).filter(Boolean),
+      date,dateSource:date?"rss":"unknown",dateLabel:dateLabel(date)}];
+  });
+}
+
+export function parseRelativeDate(value,now=Date.now()) {
+  const match=String(value).match(/\b(\d+)\s+(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago\b/i);
+  if(!match)return 0;
+  const unit=match[2].toLowerCase().replace(/s$/,"");
+  return now-Number(match[1])*({second:1000,minute:60000,hour:HOUR,day:24*HOUR,week:168*HOUR,month:720*HOUR,year:8760*HOUR})[unit];
+}
+
+// Only the paginated list is an archive, not the rotating "being watched" block.
+export function parseListing(html,pageUrl,now=Date.now()) {
+  const marker=[...html.matchAll(/<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]>/gi)].find(x=>stripMarkup(x[0])==="Most Recent Videos");
+  if(!marker)throw new Error("listing_structure_changed");
+  const section=html.slice(marker.index+marker[0].length).split(/<h[1-6]\b[^>]*>\s*Information\s*<\/h[1-6]>/i)[0];
+  const anchors=[...section.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi)].flatMap(match=>{
+    const tag=match[0].match(/^<a\b[^>]*>/i)?.[0]||"";
+    const url=sourceUrl(normalizeUrl(attr(tag,"href"),pageUrl));
+    return url?[{index:match.index,html:match[0],tag,url,key:videoKey(url)}]:[];
+  });
+  const items=[],seen=new Set();
+  for(let i=0;i<anchors.length;i++) {
+    const anchor=anchors[i];
+    if(seen.has(anchor.key))continue;
+    seen.add(anchor.key);
+    const next=anchors.slice(i+1).find(x=>x.key!==anchor.key);
+    const block=section.slice(anchor.index,next?.index??section.length);
+    const img=block.match(/<img\b[^>]*>/i)?.[0]||"";
+    const titleAnchor=anchors.slice(i).find(x=>x.key===anchor.key && stripMarkup(x.html).replace(/^(?:HD\s+)?(?:\d+:)+\d+\s*/i,"").trim());
+    const title=attr(anchor.tag,"title")||attr(img,"alt")||attr(img,"title")||stripMarkup(titleAnchor?.html||anchor.html).replace(/^(?:HD\s+)?(?:\d+:)+\d+\s*/i,"");
+    const text=stripMarkup(block),views=text.match(/\b([\d,]+)\s+views\b/i),rating=text.match(/(?:^|\s)(\d{1,3})\s*%/);
+    const date=parseRelativeDate(text,now);
+    items.push({id:`video:${anchor.key}`,videoId:anchor.key,sourceUrl:anchor.url,title,
+      image:imageUrl(attr(img,"data-src")||attr(img,"data-original")||attr(img,"src"),pageUrl),categories:[],
+      date,dateSource:date?"relative":"unknown",dateLabel:dateLabel(date),views:views?Number(views[1].replace(/,/g,"")):null,
+      ratingPercent:rating && Number(rating[1])<=100?Number(rating[1]):null,listingCheckedAt:new Date(now).toISOString()});
   }
+  if(!items.length)throw new Error("listing_empty_or_unavailable");
+  const current=Number(pageUrl.match(/page=(\d+)/)?.[1]||1);
+  const hasNext=(section.match(/<a\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,"href"),pageUrl))
+    .some(url=>Number(url.match(/[?\/]page=(\d+)/)?.[1]||0)>current);
+  return {items,hasNext};
 }
 
-function videoKey(value) {
-  const url = normalizeUrl(value);
-  const match = url.match(/\/video\/(\d+)/i);
-  return match ? `video:${match[1]}` : url;
-}
-
-function stripMarkup(value = "") {
-  return decode(value)
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function firstAttr(block, names) {
-  const re = new RegExp(`\\b(?:${names.join("|")})=["']([^"']+)`, "i");
-  const match = block.match(re);
-  return match ? decode(match[1]) : "";
-}
-
-function parseListing(html, pageUrl) {
-  const links = html.match(/<a\b[^>]*href=["'][^"']*\/video\/[^"'#?]+["'][^>]*>[\s\S]*?<\/a>/gi) || [];
-  const items = [];
-  const seen = new Set();
-  for (const link of links) {
-    const hrefMatch = link.match(/\bhref=["']([^"']+)/i);
-    const sourceUrl = hrefMatch ? normalizeUrl(hrefMatch[1], pageUrl) : "";
-    if (!/^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(sourceUrl) || seen.has(sourceUrl)) continue;
-    seen.add(sourceUrl);
-    const body = link.replace(/^[\s\S]*?>/, "").replace(/<\/a>\s*$/i, "");
-    const slug = sourceUrl.split("/").pop().replace(/[-_]+/g, " ");
-    const title = stripMarkup(body) || decode(slug) || "TokyoMotion作品";
-    const imageValue = firstAttr(body, ["data-src", "data-original", "src"]);
-    const image = imageValue ? normalizeUrl(imageValue, pageUrl) : "";
-    items.push({ id: sourceUrl, title, sourceUrl, image, embedUrl: "", categories: [], date: 0, dateLabel: "日付不明" });
+export function parseDetail(html,now=Date.now()) {
+  const text=stripMarkup(html);
+  if(/This is a private video|video (?:has been|was) (?:removed|deleted)|video (?:does not exist|not found)/i.test(text)) {
+    return {availability:"unavailable",embedUrl:"",likes:null,dislikes:null,detailCheckedAt:new Date(now).toISOString(),statsVersion:SCHEMA_VERSION};
   }
-  return items;
+  const embed=embedUrl(html),marker=text.indexOf("Embed Video");
+  if(!embed||marker<0)throw new Error("detail_unavailable_or_structure_changed");
+  // Never read votes from CSS widths, scripts, or a "dislike" substring.
+  const votes=text.slice(0,marker).match(/(?:^|\s)([\d,]+)\s+([\d,]+)\s*$/);
+  // The uploader line identifies the main work's count, not a related card.
+  const info=text.slice(marker).split(/Related Videos|Comments/)[0];
+  const viewMatch=info.match(/\b(?:\d+\s+(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?)\s+ago)\s*,\s*([\d,]+)\s+views\b/i);
+  const rawDate=meta(html,"datePublished")||meta(html,"uploadDate")||attr(html.match(/<time\b[^>]*datetime=["'][^"']+["'][^>]*>/i)?.[0]||"","datetime");
+  const exact=rawDate?Date.parse(rawDate):NaN,relative=viewMatch?parseRelativeDate(viewMatch[0],now):0;
+  const date=Number.isFinite(exact)?exact:relative;
+  return {title:meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,""),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
+    embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
+    likes:votes?Number(votes[1].replace(/,/g,"")):null,dislikes:votes?Number(votes[2].replace(/,/g,"")):null,
+    date,dateSource:Number.isFinite(exact)?"official":date?"relative":"unknown",dateLabel:dateLabel(date),
+    statsVersion:SCHEMA_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:null};
 }
 
-function parseFeed(xml) {
-  const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-  return blocks.map((block, index) => {
-    const title = textTag(block, "title") || "TokyoMotion作品";
-    const sourceUrl = textTag(block, "link") || attrTag(block, "link") || textTag(block, "guid");
-    const description = textTag(block, "description") + " " + textTag(block, "encoded");
-    const image = attrTag(block, "thumbnail") || attrTag(block, "content") || attrTag(block, "enclosure") || textTag(block, "url");
-    const embedMatch = (description + " " + block).match(/https?:\/\/(?:www\.)?tokyomotion\.net\/embed\/[A-Za-z0-9_-]+/i);
-    const categories = [...block.matchAll(/<(?:[\w.-]+:)?category(?:\s[^>]*)?>([\s\S]*?)<\/(?:[\w.-]+:)?category>/gi)]
-      .map((match) => decode(match[1]).replace(/<[^>]+>/g, "").trim()).filter(Boolean);
-    const rawDate = textTag(block, "pubDate") || textTag(block, "date") || textTag(block, "published");
-    const date = rawDate ? Date.parse(rawDate) : 0;
-    const id = textTag(block, "guid") || sourceUrl || `${title}-${index}`;
-    const timestamp = Number.isFinite(date) ? date : 0;
-    return { id, title, sourceUrl, image, embedUrl: embedMatch ? embedMatch[0] : "", categories, date: timestamp, dateLabel: timestamp ? new Date(timestamp).toLocaleDateString("ja-JP") : "日付不明" };
-  }).filter((item) => item.sourceUrl && /^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(item.sourceUrl));
+export function migrateItems(data) {
+  return (data.items||[]).map(item=>{
+    if(item.statsVersion===SCHEMA_VERSION)return item;
+    // v1 can contain percentages mislabelled as votes, and dates from related items.
+    const {views,likes,dislikes,ratingPercent,date,dateLabel,dateSource,detailCheckedAt,...rest}=item;
+    return {...rest,views:null,likes:null,dislikes:null,ratingPercent:null,date:0,dateLabel:"日付不明",dateSource:"unknown",statsVersion:0};
+  });
 }
 
-function parseRelativeDate(value, now = Date.now()) {
-  const match = String(value).match(/(\d+)\s+(minutes?|hours?|days?|weeks?|months?|years?)\s+ago/i);
-  if (!match) return 0;
-  const amount = Number(match[1]);
-  const unit = match[2].toLowerCase();
-  const factors = { minute: 60e3, minutes: 60e3, hour: 36e5, hours: 36e5, day: 864e5, days: 864e5, week: 6048e5, weeks: 6048e5, month: 2592e6, months: 2592e6, year: 31536e6, years: 31536e6 };
-  return Number.isFinite(amount) && factors[unit] ? now - amount * factors[unit] : 0;
-}
-
-function parseDetailDate(html) {
-  const iso = html.match(/<time\b[^>]*datetime=["']([^"']+)["']/i);
-  if (iso) {
-    const timestamp = Date.parse(iso[1]);
-    if (Number.isFinite(timestamp)) return timestamp;
-  }
-  return parseRelativeDate(stripMarkup(html));
-}
-
-function parseDetailStats(html) {
-  const clean = stripMarkup(html);
-  const viewMatch = clean.match(/([\d,]+)\s*views?\b/i);
-  const views = viewMatch ? Number(viewMatch[1].replace(/,/g, "")) : null;
-  const marker = clean.search(/Embed\s+Video/i);
-  const section = marker >= 0 ? clean.slice(Math.max(0, marker - 7000), marker) : clean.slice(0, 7000);
-  const pair = clean.match(/(?:^|\s)([\d,]+)\s+([\d,]+)\s+Embed\s+Video\b/i);
-  const likeMatch = section.match(/(?:like|upvote|positive)[^\d]{0,120}([\d,]+)/i);
-  const dislikeMatch = section.match(/(?:dislike|downvote|negative)[^\d]{0,120}([\d,]+)/i);
-  const likes = pair ? Number(pair[1].replace(/,/g, "")) : likeMatch ? Number(likeMatch[1].replace(/,/g, "")) : null;
-  const dislikes = pair ? Number(pair[2].replace(/,/g, "")) : dislikeMatch ? Number(dislikeMatch[1].replace(/,/g, "")) : null;
-  return { views: Number.isFinite(views) ? views : null, likes: Number.isFinite(likes) ? likes : null, dislikes: Number.isFinite(dislikes) ? dislikes : null };
-}
-
-function mergeItems(...lists) {
-  const map = new Map();
-  for (const item of lists.flat()) {
-    const sourceUrl = normalizeUrl(item.sourceUrl || item.id);
-    const key = videoKey(sourceUrl);
-    if (!sourceUrl || !/^https?:\/\/(?:www\.)?tokyomotion\.net\/video\//i.test(sourceUrl) || !key) continue;
-    const previous = map.get(key);
-    if (!previous) {
-      map.set(key, { ...item, id: item.id || sourceUrl, sourceUrl, categories: [...new Set(item.categories || [])] });
-      continue;
+export function mergeItems(...lists) {
+  const map=new Map(),dateRank={unknown:0,relative:1,rss:2,official:3};
+  for(const item of lists.flat()) {
+    const url=sourceUrl(item.sourceUrl),key=videoKey(url);
+    if(!key)continue;
+    const old=map.get(key),result={...old,...item,id:old?.id||item.id||`video:${key}`,videoId:key,sourceUrl:url,
+      categories:[...new Set([...(old?.categories||[]),...(item.categories||[])])]};
+    for(const field of ["title","image","embedUrl"])if(!item[field] && old?.[field] && item.availability!=="unavailable")result[field]=old[field];
+    if(old?.date && (!item.date||(dateRank[old.dateSource]||0)>=(dateRank[item.dateSource]||0))) {
+      result.date=old.date;result.dateSource=old.dateSource;result.dateLabel=old.dateLabel;
     }
-    const date = item.date || previous.date || 0;
-    map.set(key, {
-      ...previous,
-      ...item,
-      id: previous.id || item.id || sourceUrl,
-      sourceUrl,
-      title: item.title && item.title !== "TokyoMotion作品" ? item.title : previous.title,
-      image: item.image || previous.image || "",
-      embedUrl: item.embedUrl || previous.embedUrl || "",
-      date,
-      dateLabel: date ? (item.date ? item.dateLabel : previous.dateLabel) : "日付不明",
-      views: item.views != null ? item.views : previous.views ?? null,
-      likes: item.likes != null ? item.likes : previous.likes ?? null,
-      dislikes: item.dislikes != null ? item.dislikes : previous.dislikes ?? null,
-      categories: [...new Set([...(previous.categories || []), ...(item.categories || [])])]
-    });
+    if(old && !Object.hasOwn(item,"detailCheckedAt")) {
+      for(const field of ["views","ratingPercent"])if(item[field]==null && old[field]!=null)result[field]=old[field];
+    }
+    map.set(key,result);
   }
   return [...map.values()];
 }
 
-async function fetchText(url, timeoutMs = 20000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { headers: { "User-Agent": "TokyoMotion-Catalog/1.0", Accept: "text/html, application/rss+xml, application/xml" }, signal: controller.signal });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    return await response.text();
-  } finally {
-    clearTimeout(timeout);
-  }
+export function detailQueue(items,now,limit=100) {
+  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
+  const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>Number(b.videoId)-Number(a.videoId));
+  const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
+  const selected=[...pending.slice(0,Math.max(1,Math.floor(limit*.65))),...refresh.slice(0,Math.max(1,Math.floor(limit*.35)))];
+  const keys=new Set(selected.map(x=>x.videoId));
+  for(const item of [...pending,...refresh])if(selected.length<limit&&!keys.has(item.videoId)){selected.push(item);keys.add(item.videoId);}
+  return selected.slice(0,limit);
 }
 
-async function enrich(item) {
-  if (item.embedUrl && item.image && item.views != null && item.likes != null && item.dislikes != null) return item;
-  try {
-    const html = await fetchText(item.sourceUrl);
-    const match = html.match(/https?:\/\/(?:www\.)?tokyomotion\.net\/embed\/[A-Za-z0-9_-]+/i);
-    const imageMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)/i)
-      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
-    let image = item.image;
-    if (!image && imageMatch) {
-      try { image = new URL(decode(imageMatch[1]), item.sourceUrl).href; } catch (_) {}
-    }
-    const detailDate = parseDetailDate(html);
-    const stats = parseDetailStats(html);
-    const date = item.date || detailDate || 0;
-    return { ...item, image, embedUrl: match ? match[0] : item.embedUrl || "", date, dateLabel: date ? new Date(date).toLocaleDateString("ja-JP") : item.dateLabel || "日付不明", ...stats };
-  } catch (error) {
-    console.warn(`detail fetch skipped: ${item.sourceUrl} (${error.message})`);
-    return item;
-  }
+export async function fetchText(url) {
+  const response=await fetch(url,{headers:{"User-Agent":"TokyoMotion-Catalog/2.0",Accept:"text/html, application/rss+xml, application/xml"},signal:AbortSignal.timeout(20000)});
+  if(!response.ok){const error=new Error(`HTTP_${response.status}`);error.status=response.status;throw error;}
+  const text=await response.text();
+  if(/Site Unavailable|Verify you are human|Checking your browser|Access Denied/i.test(text.slice(0,3000)))throw new Error("source_access_unavailable");
+  return text;
 }
 
-async function mapLimit(items, limit, fn) {
-  const output = new Array(items.length);
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++;
-      output[index] = await fn(items[index]);
-    }
+export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),backfillPages=2,detailLimit=100,delayMs=300}={}) {
+  let accessBlocked=false;
+  const errors=[];
+  const request=async url=>{
+    if(accessBlocked)throw new Error("source_access_unavailable");
+    try{return await getText(url);}catch(error){if([401,403,429].includes(error.status)||error.message==="source_access_unavailable")accessBlocked=true;throw error;}
+    finally{if(delayMs)await new Promise(resolve=>setTimeout(resolve,delayMs));}
+  };
+  let feed=[];
+  try{feed=parseFeed(await request(RSS_URL));if(!feed.length)throw new Error("rss_empty_or_changed");}
+  catch(error){errors.push({stage:"rss",reason:error.message});}
+  const listings=[];
+  let successfulListings=0;
+  for(const page of [1,2]) {
+    try{const result=parseListing(await request(page===1?SOURCE:`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);listings.push(...result.items);successfulListings++;}
+    catch(error){errors.push({stage:"recent",page,reason:error.message});if(accessBlocked)break;}
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return output;
+  const backfill={nextPage:3,complete:false,...previous.backfill},startPage=backfill.nextPage;
+  let processedPages=0;
+  for(let i=0;i<backfillPages&&!backfill.complete&&!accessBlocked;i++) {
+    const page=backfill.nextPage;
+    try {
+      const result=parseListing(await request(`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);
+      listings.push(...result.items);successfulListings++;processedPages++;backfill.nextPage=page+1;backfill.complete=!result.hasNext;
+    }catch(error){errors.push({stage:"backfill",page,reason:error.message});break;}
+  }
+  if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
+  let items=mergeItems(migrateItems(previous),listings,feed);
+  const queue=detailQueue(items,now,detailLimit),details=[];
+  for(const item of queue) {
+    if(accessBlocked)break;
+    try {
+      const detail=parseDetail(await request(item.sourceUrl),now);
+      const keepDate=item.dateSource==="rss"&&detail.dateSource!=="official";
+      details.push({...item,...detail,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
+    }catch(error){errors.push({stage:"detail",videoId:item.videoId,reason:error.message});}
+  }
+  items=mergeItems(items,details).map(item=>({...item,categories:item.categories||[]}));
+  items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
+  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,
+    summary:{total:items.length,newItems:items.length-new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl))).size,
+      rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
+      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt).length,withImages:items.filter(x=>x.image).length,
+      withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
 }
 
-let previousItems = [];
-try {
-  const previous = JSON.parse(await readFile(OUTPUT, "utf8"));
-  previousItems = Array.isArray(previous.items) ? previous.items : [];
-} catch (_) {}
+async function main() {
+  let previous={items:[]};
+  try{previous=JSON.parse(await readFile(OUTPUT,"utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
+  const result=await updateCatalog(previous);
+  await mkdir(new URL("../data/",import.meta.url),{recursive:true});
+  const temp=new URL(`${OUTPUT.href}.tmp`);
+  await writeFile(temp,`${JSON.stringify(result,null,2)}\n`);await rename(temp,OUTPUT);
+  console.log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,errors:result.errors}));
+}
 
-const xml = await fetchText(RSS_URL);
-const feedItems = parseFeed(xml).slice(0, 80);
-const pageUrls = Array.from({ length: Math.max(1, LISTING_PAGES) }, (_, index) => index === 0 ? SOURCE : `${SOURCE}/page=${index + 1}`);
-const listingHtml = await mapLimit(pageUrls, 3, async (url) => {
-  try { return { url, html: await fetchText(url) }; }
-  catch (error) { console.warn(`listing fetch skipped: ${url} (${error.message})`); return { url, html: "" }; }
-});
-const listingItems = listingHtml.flatMap(({ url, html }) => html ? parseListing(html, url) : []);
-const mergedItems = mergeItems(previousItems, feedItems, listingItems);
-const items = await mapLimit(mergedItems.slice(0, MAX_ITEMS), 4, enrich);
-items.sort((a, b) => b.date - a.date);
-await mkdir(new URL("../data/", import.meta.url), { recursive: true });
-await writeFile(OUTPUT, `${JSON.stringify({ updatedAt: new Date().toISOString(), source: RSS_URL, listingPages: LISTING_PAGES, items }, null, 2)}\n`);
-console.log(`updated ${items.length} catalog items from RSS and ${listingHtml.length} official pages`);
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(error.message);process.exitCode=1;});

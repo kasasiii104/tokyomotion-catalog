@@ -3,6 +3,10 @@ name: Update TokyoMotion catalog
 on:
   push:
     branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/update-catalog.yml'
   schedule:
     - cron: "*/30 * * * *"
   workflow_dispatch:
@@ -12,18 +16,24 @@ permissions:
 
 concurrency:
   group: update-tokyomotion-catalog
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+      - name: Test parsers, accumulation, backfill and UI
+        run: node --test tests/catalog.test.mjs
       - name: Fetch RSS, archived listing pages, stats and official embed URLs
         run: node scripts/update.mjs
       - name: Commit changed catalog data
@@ -33,4 +43,5 @@ jobs:
           git add data/videos.json
           git diff --cached --quiet && exit 0
           git commit -m "chore: update TokyoMotion catalog"
+          git pull --rebase origin main
           git push
