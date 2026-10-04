@@ -55,11 +55,17 @@ async function fetchText(url, timeoutMs = 20000) {
 }
 
 async function enrich(item) {
-  if (item.embedUrl) return item;
+  if (item.embedUrl && item.image) return item;
   try {
     const html = await fetchText(item.sourceUrl);
     const match = html.match(/https?:\/\/(?:www\.)?tokyomotion\.net\/embed\/[A-Za-z0-9_-]+/i);
-    return { ...item, embedUrl: match ? match[0] : "" };
+    const imageMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    let image = item.image;
+    if (!image && imageMatch) {
+      try { image = new URL(decode(imageMatch[1]), item.sourceUrl).href; } catch (_) {}
+    }
+    return { ...item, image, embedUrl: match ? match[0] : "" };
   } catch (error) {
     console.warn(`detail fetch skipped: ${item.sourceUrl} (${error.message})`);
     return item;
