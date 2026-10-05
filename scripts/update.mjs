@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
+import { classifyTitle, filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
 
 export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
@@ -164,7 +164,10 @@ export function parseDetail(html,now=Date.now(),videoId='') {
   const date=Number.isFinite(exact)?exact:relative;
   const mainId=videoId||videoKey(meta(html,'og:url'));
   const preview=(html.match(/<img\b[^>]*>/gi)||[]).map(tag=>parseThumbnailPreview(tag,mainId,now)).find(Boolean);
-  return {title:meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,""),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
+  const title=meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,"");
+  const rawDescription=stripMarkup(meta(html,'og:description')).slice(0,2000);
+  const description=rawDescription!==title&&classifyTitle(rawDescription).keep?rawDescription:'';
+  return {title,description,image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
     ...(preview?{preview}:{}),previewVersion:PREVIEW_VERSION,
     embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
     likes,dislikes,ratingPercent:likes!=null&&dislikes!=null&&likes+dislikes>0?100*likes/(likes+dislikes):null,
@@ -210,23 +213,15 @@ export function detailQueue(items,now,limit=240) {
   return selected.slice(0,limit);
 }
 
-let previewDetailDiagnosed=false;
 export async function fetchText(url) {
   const response=await fetch(url,{headers:{"User-Agent":"TokyoMotion-Catalog/2.0",Accept:"text/html, application/rss+xml, application/xml"},signal:AbortSignal.timeout(20000)});
   if(!response.ok){const error=new Error(`HTTP_${response.status}`);error.status=response.status;throw error;}
   const text=await response.text();
   if(/Site Unavailable|Verify you are human|Checking your browser|Access Denied/i.test(text.slice(0,3000)))throw new Error("source_access_unavailable");
-  if(videoKey(url)&&!previewDetailDiagnosed) {
-    previewDetailDiagnosed=true;const id=videoKey(url);
-    const imageAttributes=(text.match(/<img\b[^>]*>/gi)||[]).filter(tag=>tag.includes('/'+id+'/')||attr(tag,'id').startsWith('rotate_'+id+'_')).slice(0,6).map(tag=>Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].filter(x=>!['alt','title'].includes(x[1].toLowerCase())).map(x=>[x[1],decode(x[2]??x[3])])));
-    const scripts=(text.match(/<script\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,'src'))).filter(Boolean).map(u=>({host:new URL(u).hostname,path:new URL(u).pathname}));
-    const descriptionContainers=(text.match(/<(?:div|p)\b[^>]*>/gi)||[]).filter(tag=>/description/i.test(tag)).slice(0,8).map(tag=>({id:attr(tag,'id'),class:attr(tag,'class')}));
-    console.log(JSON.stringify({diagnostic:'detail_preview_shape',videoId:id,imageAttributes,scripts,descriptionContainers,hasOGDescription:!!meta(text,'og:description')}));
-  }
   return text;
 }
 
-export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,backfillPages=12,detailLimit=240,delayMs=300}={}) {
+export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,backfillPages=12,previewAuditPages=24,detailLimit=240,delayMs=300}={}) {
   let accessBlocked=false;
   const errors=[];
   const request=async url=>{
@@ -259,6 +254,19 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const candidates=mergeItems(migrateItems(previous),listings,feed);
   const discoveryAudit=filterJapanese(candidates);
   let items=discoveryAudit.accepted;
+  // One bounded rescan of already-visited lists repairs old items without guessing image URLs.
+  // Keep the archive discovery cursor intact and never add a work solely from this audit.
+  const auditEnd=Math.max(recentPages,Number(previous.backfill?.nextPage||recentPages+1)-1);
+  const previewAudit=previous.previewAudit?.version===PREVIEW_VERSION?{...previous.previewAudit}:{version:PREVIEW_VERSION,nextPage:recentPages+1,endPage:auditEnd,complete:auditEnd<=recentPages};
+  const existing=new Map(items.map(x=>[x.videoId,x]));let previewAuditProcessed=0;
+  for(let i=0;i<previewAuditPages&&!previewAudit.complete&&!accessBlocked;i++){
+    const page=previewAudit.nextPage;
+    try{
+      const result=parseListing(await request(`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);
+      for(const found of result.items){const old=existing.get(found.videoId);if(old&&found.preview&&!['unavailable','not_found'].includes(old.availability)){old.preview=found.preview;old.previewVersion=PREVIEW_VERSION}}
+      previewAudit.nextPage=page+1;previewAuditProcessed++;previewAudit.complete=!result.hasNext||previewAudit.nextPage>previewAudit.endPage;
+    }catch(error){errors.push({stage:'preview_audit',page,reason:error.message});break}
+  }
   const queue=detailQueue(items,now,detailLimit),details=[];
   for(const item of queue) {
     if(accessBlocked)break;
@@ -277,12 +285,12 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
   const rejected=[...discoveryAudit.rejected,...finalAudit.rejected],reasons={};
   for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
-  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,
+  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,
     languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting:previousAudit.rejected.length,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+previousAudit.rejected.length,reasons},
-    collection:{recentPages,backfillPages,detailLimit},
+    collection:{recentPages,backfillPages,previewAuditPages,detailLimit},
     summary:{total:items.length,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
-      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION).length,withImages:items.filter(x=>x.image).length,withPreviews:items.filter(x=>x.preview).length,
+      detailRefreshed:details.length,previewAuditPages:previewAuditProcessed,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION).length,withImages:items.filter(x=>x.image).length,withPreviews:items.filter(x=>x.preview&&!['unavailable','not_found'].includes(x.availability)).length,
       withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
 }
 

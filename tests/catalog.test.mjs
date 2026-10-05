@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { classifyTitle, filterJapanese } from '../assets/language.mjs';
 import { PAGE_SIZE, escapeHTML, stats, safeUrl, prepareItems, selectItems } from '../assets/catalog-core.mjs';
+import { PreviewController, previewSpec } from '../assets/preview-controller.mjs';
 import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
 
 const NOW=Date.parse('2026-10-04T10:00:00Z');
@@ -108,12 +109,12 @@ test('404 keeps the catalog entry, removes stale embed and defers recheck',async
   const x=result.items.find(x=>x.videoId==='9999');assert.equal(x.availability,'not_found');assert.equal(x.embedUrl,'');assert.equal(x.lastError,'HTTP_404');assert.equal(detailQueue([x],NOW).length,0);
 });
 
-test('UI has inline playback and no modal or initial age gate',async()=>{
+test('UI separates card preview, details and full playback without a preview-close button',async()=>{
   const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
   const script=await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8');
-  new vm.Script(script.replace(/^import .*;\n/,''));
-  assert.ok(!html.includes('id="age"'));assert.ok(!html.includes('id="modal"'));assert.ok(html.includes('id="more"'));assert.ok(html.includes('id="shelf"'));
-  assert.ok(script.includes('media.append(frame)'));assert.ok(script.includes('active.frame?.remove()'));
+  new vm.Script(script.replace(/^import .*;\n/gm,''));
+  assert.ok(!html.includes('id="age"'));assert.ok(html.includes('<dialog id="details"'));assert.ok(html.includes('id="more"'));assert.ok(html.includes('id="shelf"'));
+  assert.ok(script.includes("$('watch-media').append(frame)"));assert.ok(!script.includes('data-stop'));assert.ok(!script.includes('プレビューを閉じる'));
   assert.equal(stats({statsVersion:2,views:null,likes:null,dislikes:null}).views,'再生数 未取得');
   assert.equal(stats({statsVersion:2,views:0,likes:0,dislikes:0}).views,'0回再生');
   assert.equal(safeUrl('javascript:alert(1)','embed'),'');assert.equal(safeUrl('https://example.com/embed/abc','embed'),'');
@@ -155,39 +156,108 @@ test('search, favorites, history and missing-date ordering use the full catalog'
   assert.equal(selectItems([a,b,c],{query:'作品 2'}).length,1);
 });
 
-async function inlineHarness(){
+const previewData={type:'images',source:'official_thumbnail_rotation',baseUrl:'https://cdn.tokyo-motion.net/media/videos/tmb75/1/',count:20};
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+function controllerHarness(load=async url=>url){
+  const timers=new Map();let id=0;
+  const controller=new PreviewController({load,schedule:(fn,ms)=>{timers.set(++id,{fn,ms});return id},cancel:key=>timers.delete(key)});
+  async function advance(){const task=[...timers].find(([,x])=>x.ms===700);assert.ok(task,'next frame is scheduled');timers.delete(task[0]);task[1].fn();await tick()}
+  return {controller,timers,advance};
+}
+test('client accepts only declared frames of the same work',()=>{
+  assert.equal(previewSpec({...item(1),preview:previewData}).urls.length,20);
+  for(const patch of [{videoId:'2'},{availability:'unavailable'},{preview:{...previewData,count:99}},{preview:{...previewData,baseUrl:'https://example.com/media/videos/tmb75/1/'}}])assert.equal(previewSpec({...item(1),preview:previewData,...patch}),null);
+});
+test('tap starts, next tap freezes, next tap resumes without a close control',async()=>{
+  const {controller:c,timers,advance}=controllerHarness();let frame='',status='';
+  const spec=previewSpec({...item(1),preview:previewData}),handlers={onFrame:u=>frame=u,onState:s=>status=s};
+  assert.equal(timers.size,0);
+  c.toggle('one',spec,handlers);await tick();assert.equal(status,'playing');assert.match(frame,/1\.jpg$/);
+  await advance();assert.match(frame,/2\.jpg$/);
+  c.toggle('one',spec,handlers);assert.equal(status,'paused');assert.equal(timers.size,0);const frozen=frame;
+  await tick();assert.equal(frame,frozen);
+  c.toggle('one',spec,handlers);await tick();assert.match(frame,/3\.jpg$/);assert.equal(status,'playing');c.stop();assert.equal(timers.size,0);
+});
+test('switching cards cancels in-flight load and stale frames cannot update either card',async()=>{
+  const pending=[];const {controller:c}=controllerHarness((url,signal)=>new Promise(resolve=>pending.push({resolve,signal})));
+  let first=0,second=0,resets=0;const spec={urls:['one','two'],interval:700};
+  c.toggle('one',spec,{onFrame:()=>first++,onReset:()=>resets++});
+  c.toggle('two',spec,{onFrame:()=>second++});
+  assert.equal(pending[0].signal.aborted,true);assert.equal(resets,1);
+  pending[0].resolve();pending[1].resolve();await tick();assert.equal(first,0);assert.equal(second,1);c.stop();
+});
+test('pause during a network request ignores its later completion',async()=>{
+  let resolve,frames=0;const {controller:c,timers}=controllerHarness(()=>new Promise(r=>resolve=r));
+  c.toggle('one',{urls:['one','two'],interval:700},{onFrame:()=>frames++});c.pause();resolve();await tick();assert.equal(frames,0);assert.equal(timers.size,0);
+});
+test('failed preview images stop after three failures and do not retry forever',async()=>{
+  const {controller:c,timers,advance}=controllerHarness(async()=>{throw Error('unavailable')});let status='';
+  c.toggle('one',{urls:['one','two','three','four'],interval:700},{onState:s=>status=s});await tick();await advance();await advance();
+  assert.equal(status,'error');assert.equal(c.active.playing,false);assert.equal(timers.size,0);c.stop();
+});
+test('archive preview audit resumes separately and updates only previously collected works',async()=>{
+  const initial={items:[{...item(193),statsVersion:2,previewVersion:1,ratingVersion:1,detailCheckedAt:new Date(NOW).toISOString()}],backfill:{nextPage:10,complete:true}};
+  const source=async u=>(await mockSource(u)).replace('<img src=',u.includes('page=7')?'<img id="rotate_193_20_1_recent" src=':'<img src=').replace('https://cdn.tokyo-motion.net/193.jpg','https://cdn.tokyo-motion.net/media/videos/tmb75/193/1.jpg');
+  const result=await updateCatalog(initial,{getText:source,now:NOW,delayMs:0,detailLimit:0,backfillPages:0,recentPages:1,previewAuditPages:7});
+  assert.equal(result.items.find(x=>x.videoId==='193').preview.count,20);assert.equal(result.previewAudit.nextPage,9);assert.equal(result.backfill.nextPage,10);
+  assert.ok(!result.items.some(x=>x.videoId==='195'));
+  const again=await updateCatalog(result,{getText:source,now:NOW,delayMs:0,detailLimit:0,backfillPages:0,recentPages:1,previewAuditPages:7});
+  assert.equal(again.previewAudit.complete,true);assert.equal(again.previewAudit.nextPage,10);
+});
+test('preview audit failure retains its page cursor',async()=>{
+  const previous={items:[item(1)],backfill:{nextPage:10,complete:true}};
+  const result=await updateCatalog(previous,{getText:u=>u.includes('page=7')?Promise.reject(Error('timeout')):mockSource(u),now:NOW,delayMs:0,detailLimit:0,backfillPages:0});
+  assert.equal(result.previewAudit.nextPage,7);assert.ok(result.errors.some(x=>x.stage==='preview_audit'));
+});
+
+async function uiHarness(){
   class Element{
-    constructor(tag='div'){this.tag=tag;this.children=[];this.listeners={};this.dataset={};this.attributes={};this.value='';this.isConnected=true;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle:(x,on)=>on?classes.add(x):classes.delete(x)}}
+    constructor(tag='div'){this.tag=tag;this.children=[];this.listeners={};this.dataset={};this.attributes={};this.value='';this.isConnected=true;this.hidden=false;this.open=false;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x),contains:x=>classes.has(x),toggle:(x,on)=>on?classes.add(x):classes.delete(x)}}
     set innerHTML(value){this.html=value;this.replaceChildren()}
     get innerHTML(){return this.html||''}
     append(...nodes){for(const node of nodes){this.children.push(node);node.parent=this}}
-    replaceChildren(...nodes){for(const child of this.children)child.parent=null;this.children=[];this.append(...nodes)}
-    remove(){this.removed=true;if(this.parent)this.parent.children=this.parent.children.filter(x=>x!==this);this.parent=null}
+    replaceChildren(...nodes){for(const child of this.children){child.parent=null;child.removed=true}this.children=[];this.append(...nodes)}
     setAttribute(key,value){this.attributes[key]=value}
     addEventListener(key,fn){this.listeners[key]=fn}
     focus(){this.focused=true}
+    showModal(){this.open=true}
+    close(){this.open=false;this.listeners.close?.()}
     insertAdjacentHTML(position,html){this.inserted=html}
     querySelectorAll(){return []}
-    querySelector(selector){if(selector==='.media')return this.media;if(selector==='.player-controls'||selector==='.player-message')return this.children.find(x=>x.className===selector.slice(1))||null;return new Element('button')}
+    querySelector(selector){return ({'.media':this.media,'[data-preview]':this.button,'img':this.image,'.preview-indicator':this.indicator})[selector]||new Element('button')}
   }
-  const nodes=new Map();const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};get('sort').value='new';
-  const ctx=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},localStorage:{getItem:()=>'{invalid',setItem(){}},URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},PAGE_SIZE,esc:escapeHTML,safeUrl,stats,prepareItems,selectItems});
-  const script=(await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/,'').replace(/load\(\);\s*$/,'');vm.runInContext(script,ctx);
-  const samples=[{...item(1),embedUrl:`${SOURCE}/embed/example1`},{...item(2),embedUrl:`${SOURCE}/embed/example2`}];ctx.samples=samples;vm.runInContext('state.items=samples;state.byId=new Map(samples.map(x=>[x.id,x]));',ctx);
-  function makeCard(id){const card=new Element('article');card.dataset.id=`video:${id}`;card.media=new Element();card.append(card.media);return card}
-  return {ctx,makeCard,nodes};
+  const nodes=new Map(),events={};const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};get('sort').value='new';
+  class TestController extends PreviewController{constructor(){super({load:async()=>{},schedule:()=>1,cancel(){}})}}
+  const ctx=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],addEventListener:(key,fn)=>events[key]=fn},window:{scrollY:123,scrollTo(){},addEventListener(){}},localStorage:{getItem:()=>'{invalid',setItem(){}},URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},PAGE_SIZE,esc:escapeHTML,safeUrl,stats,prepareItems,selectItems,PreviewController:TestController,previewSpec});
+  const script=(await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'').replace(/load\(\);\s*$/,'');vm.runInContext(script,ctx);
+  const samples=[{...item(1),image:previewData.baseUrl+'default.jpg',preview:previewData,embedUrl:`${SOURCE}/embed/example1`,statsVersion:2,views:1234,likes:12,dislikes:3},{...item(2),preview:{...previewData,baseUrl:previewData.baseUrl.replace('/1/','/2/')},embedUrl:`${SOURCE}/embed/example2`}];ctx.samples=samples;vm.runInContext('state.items=samples;state.byId=new Map(samples.map(x=>[x.id,x]));',ctx);
+  function makeCard(id){const card=new Element('article');card.dataset.id='video:'+id;card.dataset.card='grid:video:'+id;card.media=new Element();card.button=new Element('button');card.button.image=new Element('img');card.button.image.src=previewData.baseUrl+'default.jpg';card.button.indicator=new Element();card.append(card.media);return card}
+  return {ctx,makeCard,nodes,events};
 }
-test('inline player replaces its card thumbnail and switching destroys the first frame',async()=>{
-  const {ctx,makeCard}=await inlineHarness();ctx.firstCard=makeCard(1);ctx.secondCard=makeCard(2);
-  vm.runInContext('startInline(firstCard)',ctx);const first=vm.runInContext('state.active.frame',ctx);assert.equal(first.parent,ctx.firstCard.media);assert.equal(first.src,`${SOURCE}/embed/example1`);
-  vm.runInContext('startInline(secondCard)',ctx);assert.equal(first.removed,true);assert.equal(vm.runInContext('state.active.frame.parent===secondCard.media',ctx),true);
-  vm.runInContext('stopInline({focus:true})',ctx);assert.equal(vm.runInContext('state.active',ctx),null);assert.match(ctx.secondCard.media.innerHTML,/thumb-button/);
+test('card contains visible views, rating, vote counts and separate preview/detail/play actions',async()=>{
+  const {ctx}=await uiHarness();const html=vm.runInContext('card(samples[0],"grid")',ctx);
+  assert.match(html,/1,234回再生/);assert.match(html,/高評価 80%/);assert.match(html,/高評価 12 \/ 低評価 3/);assert.match(html,/data-preview/);assert.match(html,/data-detail/);assert.match(html,/data-watch/);assert.ok(!html.includes('<iframe'));
 });
-test('appending more cards preserves the active player',async()=>{
-  const {ctx,makeCard,nodes}=await inlineHarness();ctx.firstCard=makeCard(2);vm.runInContext('startInline(firstCard);state.shown=1;',ctx);const frame=vm.runInContext('state.active.frame',ctx);
-  vm.runInContext('render({append:true})',ctx);assert.equal(vm.runInContext('state.active.frame',ctx),frame);assert.notEqual(frame.removed,true);assert.match(nodes.get('grid').inserted,/grid:video:1/);
+test('tap toggles the card preview and appending more cards preserves it',async()=>{
+  const {ctx,makeCard,nodes}=await uiHarness();ctx.firstCard=makeCard(1);
+  vm.runInContext('togglePreview(firstCard);state.shown=1;',ctx);await tick();
+  assert.equal(ctx.firstCard.button.dataset.state,'playing');
+  vm.runInContext('render({append:true})',ctx);assert.equal(ctx.firstCard.button.dataset.state,'playing');assert.match(nodes.get('grid').inserted,/grid:video:1/);
+  vm.runInContext('togglePreview(firstCard)',ctx);assert.equal(ctx.firstCard.button.dataset.state,'paused');assert.equal(ctx.firstCard.button.attributes['aria-pressed'],'false');
 });
-test('unavailable work shows a message inside the card without an iframe',async()=>{
-  const {ctx,makeCard}=await inlineHarness();ctx.firstCard=makeCard(1);vm.runInContext('state.byId.get("video:1").availability="not_found";startInline(firstCard)',ctx);
-  assert.equal(vm.runInContext('state.active.frame',ctx),null);assert.match(ctx.firstCard.media.innerHTML,/現在再生できません/);
+test('detail view stops preview and full player is mounted only in the watch view',async()=>{
+  const {ctx,makeCard,nodes}=await uiHarness();ctx.firstCard=makeCard(1);
+  vm.runInContext('togglePreview(firstCard)',ctx);await tick();
+  vm.runInContext('openDetails(samples[0],firstCard.button)',ctx);assert.equal(nodes.get('details').open,true);assert.equal(vm.runInContext('previews.active',ctx),null);
+  vm.runInContext('openWatch(samples[0],firstCard.button)',ctx);assert.equal(nodes.get('details').open,false);assert.equal(nodes.get('browse-view').hidden,true);
+  const frame=nodes.get('watch-media').children[0];assert.equal(frame.src,`${SOURCE}/embed/example1`);assert.equal(frame.parent,nodes.get('watch-media'));
+  vm.runInContext('showBrowse()',ctx);assert.equal(frame.removed,true);assert.equal(nodes.get('browse-view').hidden,false);assert.equal(nodes.get('watch-view').hidden,true);
+});
+test('unavailable work never starts preview or mounts a full player',async()=>{
+  const {ctx,makeCard,nodes}=await uiHarness();ctx.firstCard=makeCard(1);
+  vm.runInContext('samples[0].availability="unavailable";togglePreview(firstCard);openWatch(samples[0],firstCard.button)',ctx);
+  assert.equal(vm.runInContext('previews.active',ctx),null);assert.equal(nodes.get('watch-media'),undefined);assert.equal(ctx.firstCard.button.indicator.textContent,'プレビュー素材なし');
+});
+test('backgrounding the page pauses rather than continuing preview requests',async()=>{
+  const {ctx,makeCard,events}=await uiHarness();ctx.firstCard=makeCard(1);vm.runInContext('togglePreview(firstCard)',ctx);await tick();ctx.document.hidden=true;events.visibilitychange();assert.equal(ctx.firstCard.button.dataset.state,'paused');
 });
