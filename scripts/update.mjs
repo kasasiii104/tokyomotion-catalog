@@ -199,6 +199,12 @@ export async function fetchText(url) {
   if(!response.ok){const error=new Error(`HTTP_${response.status}`);error.status=response.status;throw error;}
   const text=await response.text();
   if(/Site Unavailable|Verify you are human|Checking your browser|Access Denied/i.test(text.slice(0,3000)))throw new Error("source_access_unavailable");
+  if(url===SOURCE) {
+    const imageAttributes=(text.match(/<img\b[^>]*>/gi)||[]).filter(tag=>/tmb|thumb|preview/i.test(tag)).slice(0,4).map(tag=>Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].filter(x=>!['alt','title'].includes(x[1].toLowerCase())).map(x=>[x[1],decode(x[2]??x[3])] )));
+    const scripts=(text.match(/<script\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,'src'))).filter(u=>u&&new URL(u).hostname.endsWith('tokyomotion.net'));
+    const handlers=[...text.matchAll(/(?:onmouseover|onmouseout)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)].slice(0,6).map(x=>decode(x[1]??x[2]));
+    console.log(JSON.stringify({diagnostic:'preview_metadata_shape',imageAttributes,scripts,handlers}));
+  }
   return text;
 }
 
