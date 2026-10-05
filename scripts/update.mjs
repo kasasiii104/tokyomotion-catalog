@@ -6,6 +6,7 @@ export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
 export const SCHEMA_VERSION = 2;
 export const RATING_VERSION = 1;
+export const PREVIEW_VERSION = 1;
 const OUTPUT = new URL("../data/videos.json", import.meta.url);
 const HOUR = 3600000;
 
@@ -58,6 +59,17 @@ function sourceUrl(value) {
 function imageUrl(value,base=SOURCE) {
   const url=normalizeUrl(value,base);
   return url && /(^|\.)(?:tokyomotion|tokyo-motion)\.net$/i.test(new URL(url).hostname) ? url.replace(/^http:/,"https:") : "";
+}
+
+export function parseThumbnailPreview(tag,expectedId,now=Date.now()) {
+  const declaration=attr(tag,'id').match(/^rotate_(\d+)_(\d+)_(\d+)(?:_|$)/);
+  const url=imageUrl(attr(tag,'data-src')||attr(tag,'data-original')||attr(tag,'src'));
+  if(!declaration||String(expectedId)!==declaration[1]||!url)return null;
+  const count=Number(declaration[2]),posterIndex=Number(declaration[3]);
+  const parsed=new URL(url);
+  if(count<2||count>40||posterIndex<1||posterIndex>count||!new RegExp(`/media/videos/tmb\\d*/${expectedId}/\\d+\\.jpg$`).test(parsed.pathname))return null;
+  parsed.pathname=parsed.pathname.replace(/\d+\.jpg$/,'');parsed.search='';parsed.hash='';
+  return {type:'images',baseUrl:parsed.href,count,posterIndex,intervalMs:700,source:'official_thumbnail_rotation',checkedAt:new Date(now).toISOString()};
 }
 
 function embedUrl(html) {
@@ -116,7 +128,8 @@ export function parseListing(html,pageUrl,now=Date.now()) {
     const title=attr(anchor.tag,"title")||attr(img,"alt")||attr(img,"title")||stripMarkup(titleAnchor?.html||anchor.html).replace(/^(?:HD\s+)?(?:\d+:)+\d+\s*/i,"");
     const text=stripMarkup(block),views=text.match(/\b([\d,]+)\s+views\b/i),rating=text.match(/(?:^|\s)(\d{1,3})\s*%/);
     const date=parseRelativeDate(text,now);
-    items.push({id:`video:${anchor.key}`,videoId:anchor.key,sourceUrl:anchor.url,title,
+    const preview=parseThumbnailPreview(img,anchor.key,now);
+    items.push({id:`video:${anchor.key}`,videoId:anchor.key,sourceUrl:anchor.url,title,...(preview?{preview,previewVersion:PREVIEW_VERSION}:{}),
       image:imageUrl(attr(img,"data-src")||attr(img,"data-original")||attr(img,"src"),pageUrl),categories:[],
       date,dateSource:date?"relative":"unknown",dateLabel:dateLabel(date),views:views?Number(views[1].replace(/,/g,"")):null,
       ratingPercent:rating && Number(rating[1])<=100?Number(rating[1]):null,listingCheckedAt:new Date(now).toISOString()});
@@ -128,10 +141,10 @@ export function parseListing(html,pageUrl,now=Date.now()) {
   return {items,hasNext};
 }
 
-export function parseDetail(html,now=Date.now()) {
+export function parseDetail(html,now=Date.now(),videoId='') {
   const text=stripMarkup(html);
   if(/This is a private video|video (?:has been|was) (?:removed|deleted)|video (?:does not exist|not found)/i.test(text)) {
-    return {availability:"unavailable",embedUrl:"",likes:null,dislikes:null,ratingPercent:null,detailCheckedAt:new Date(now).toISOString(),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION};
+    return {availability:"unavailable",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION};
   }
   const embed=embedUrl(html),marker=text.indexOf("Embed Video");
   if(!embed||marker<0)throw new Error("detail_unavailable_or_structure_changed");
@@ -149,7 +162,10 @@ export function parseDetail(html,now=Date.now()) {
   const rawDate=meta(html,"datePublished")||meta(html,"uploadDate")||attr(html.match(/<time\b[^>]*datetime=["'][^"']+["'][^>]*>/i)?.[0]||"","datetime");
   const exact=rawDate?Date.parse(rawDate):NaN,relative=viewMatch?parseRelativeDate(viewMatch[0],now):0;
   const date=Number.isFinite(exact)?exact:relative;
+  const mainId=videoId||videoKey(meta(html,'og:url'));
+  const preview=(html.match(/<img\b[^>]*>/gi)||[]).map(tag=>parseThumbnailPreview(tag,mainId,now)).find(Boolean);
   return {title:meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,""),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
+    ...(preview?{preview}:{}),previewVersion:PREVIEW_VERSION,
     embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
     likes,dislikes,ratingPercent:likes!=null&&dislikes!=null&&likes+dislikes>0?100*likes/(likes+dislikes):null,
     date,dateSource:Number.isFinite(exact)?"official":date?"relative":"unknown",dateLabel:dateLabel(date),
@@ -185,7 +201,7 @@ export function mergeItems(...lists) {
 }
 
 export function detailQueue(items,now,limit=240) {
-  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
+  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
   const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>Number(b.videoId)-Number(a.videoId));
   const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
   const selected=[...pending.slice(0,Math.max(1,Math.floor(limit*.65))),...refresh.slice(0,Math.max(1,Math.floor(limit*.35)))];
@@ -194,16 +210,18 @@ export function detailQueue(items,now,limit=240) {
   return selected.slice(0,limit);
 }
 
+let previewDetailDiagnosed=false;
 export async function fetchText(url) {
   const response=await fetch(url,{headers:{"User-Agent":"TokyoMotion-Catalog/2.0",Accept:"text/html, application/rss+xml, application/xml"},signal:AbortSignal.timeout(20000)});
   if(!response.ok){const error=new Error(`HTTP_${response.status}`);error.status=response.status;throw error;}
   const text=await response.text();
   if(/Site Unavailable|Verify you are human|Checking your browser|Access Denied/i.test(text.slice(0,3000)))throw new Error("source_access_unavailable");
-  if(url===SOURCE) {
-    const imageAttributes=(text.match(/<img\b[^>]*>/gi)||[]).filter(tag=>/tmb|thumb|preview/i.test(tag)).slice(0,4).map(tag=>Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].filter(x=>!['alt','title'].includes(x[1].toLowerCase())).map(x=>[x[1],decode(x[2]??x[3])] )));
-    const scripts=(text.match(/<script\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,'src'))).filter(u=>u&&new URL(u).hostname.endsWith('tokyomotion.net'));
-    const handlers=[...text.matchAll(/(?:onmouseover|onmouseout)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)].slice(0,6).map(x=>decode(x[1]??x[2]));
-    console.log(JSON.stringify({diagnostic:'preview_metadata_shape',imageAttributes,scripts,handlers}));
+  if(videoKey(url)&&!previewDetailDiagnosed) {
+    previewDetailDiagnosed=true;const id=videoKey(url);
+    const imageAttributes=(text.match(/<img\b[^>]*>/gi)||[]).filter(tag=>tag.includes('/'+id+'/')||attr(tag,'id').startsWith('rotate_'+id+'_')).slice(0,6).map(tag=>Object.fromEntries([...tag.matchAll(/([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)].filter(x=>!['alt','title'].includes(x[1].toLowerCase())).map(x=>[x[1],decode(x[2]??x[3])])));
+    const scripts=(text.match(/<script\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,'src'))).filter(Boolean).map(u=>({host:new URL(u).hostname,path:new URL(u).pathname}));
+    const descriptionContainers=(text.match(/<(?:div|p)\b[^>]*>/gi)||[]).filter(tag=>/description/i.test(tag)).slice(0,8).map(tag=>({id:attr(tag,'id'),class:attr(tag,'class')}));
+    console.log(JSON.stringify({diagnostic:'detail_preview_shape',videoId:id,imageAttributes,scripts,descriptionContainers,hasOGDescription:!!meta(text,'og:description')}));
   }
   return text;
 }
@@ -245,12 +263,12 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   for(const item of queue) {
     if(accessBlocked)break;
     try {
-      const detail=parseDetail(await request(item.sourceUrl),now);
+      const detail=parseDetail(await request(item.sourceUrl),now,item.videoId);
       const keepDate=item.dateSource==="rss"&&detail.dateSource!=="official";
       details.push({...item,...detail,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
     }catch(error){
       errors.push({stage:"detail",videoId:item.videoId,reason:error.message});
-      if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
+      if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
     }
   }
   const finalAudit=filterJapanese(mergeItems(items,details));
@@ -264,7 +282,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     collection:{recentPages,backfillPages,detailLimit},
     summary:{total:items.length,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
-      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION).length,withImages:items.filter(x=>x.image).length,
+      detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION).length,withImages:items.filter(x=>x.image).length,withPreviews:items.filter(x=>x.preview).length,
       withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
 }
 

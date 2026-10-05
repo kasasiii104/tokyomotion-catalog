@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { classifyTitle, filterJapanese } from '../assets/language.mjs';
 import { PAGE_SIZE, escapeHTML, stats, safeUrl, prepareItems, selectItems } from '../assets/catalog-core.mjs';
-import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
+import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
 
 const NOW=Date.parse('2026-10-04T10:00:00Z');
 const url=id=>`${SOURCE}/video/${id}/test`;
@@ -27,6 +27,21 @@ test('archive excludes watched/recommendation block, deduplicates anchors and ex
 });
 test('missing list structure is a failure, never a fake empty archive',()=>{
   assert.throws(()=>parseListing('<h1>Site Unavailable</h1>',SOURCE),/listing_structure_changed/);
+});
+test('preview frames require official rotation metadata for the matching work',()=>{
+  const tag='<img id="rotate_201_20_9_viewed" src="https://cdn.tokyo-motion.net/media/videos/tmb75/201/9.jpg">';
+  const p=parseThumbnailPreview(tag,'201',NOW);
+  assert.equal(p.count,20);assert.equal(p.posterIndex,9);assert.equal(p.baseUrl,'https://cdn.tokyo-motion.net/media/videos/tmb75/201/');
+  assert.equal(parseThumbnailPreview(tag,'202',NOW),null);
+  assert.equal(parseThumbnailPreview(tag.replace('tokyo-motion.net','example.com'),'201',NOW),null);
+  assert.equal(parseThumbnailPreview(tag.replace('_20_','_99_'),'201',NOW),null);
+  assert.equal(parseThumbnailPreview(tag.replace('rotate_201_20_9_viewed','poster'),'201',NOW),null);
+});
+test('detail previews never use a related work rotation',()=>{
+  const rotation=id=>`<img id="rotate_${id}_20_1_related" src="https://cdn.tokyo-motion.net/media/videos/tmb75/${id}/1.jpg">`;
+  assert.equal(parseDetail(detail()+rotation(202),NOW,'201').preview,undefined);
+  assert.equal(parseDetail(detail()+rotation(201),NOW,'201').preview.count,20);
+  assert.equal(parseDetail('This is a private video'+rotation(201),NOW,'201').preview,null);
 });
 test('detail reads votes and main view count, not CSS percent or related views',()=>{
   const x=parseDetail(detail(),NOW);assert.equal(x.likes,12);assert.equal(x.dislikes,3);assert.equal(x.views,1234);assert.equal(x.title,'テスト作品 201');
@@ -56,7 +71,7 @@ test('numeric ID merges URL spelling variants and keeps exact dates',()=>{
   assert.equal(x.date,NOW);assert.equal(x.dateSource,'rss');
 });
 test('complete metadata is periodically refreshed',()=>{
-  const x={...item(1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(NOW-25*3600000).toISOString()};assert.equal(detailQueue([x],NOW).length,1);
+  const x={...item(1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(NOW-25*3600000).toISOString()};assert.equal(detailQueue([x],NOW).length,1);
   assert.equal(detailQueue([{...x,detailCheckedAt:new Date(NOW).toISOString()}],NOW).length,0);
 });
 test('previous parser versions are re-audited even when recently checked',()=>{
@@ -70,7 +85,7 @@ const mockSource=async requested=>{
   return detail(Number(requested.match(/\/video\/(\d+)/)?.[1]||1));
 };
 test('100 existing works do not suppress incoming works; archive resumes across runs',async()=>{
-  const previous={items:Array.from({length:100},(_,i)=>({...item(i+1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(NOW).toISOString()}))};
+  const previous={items:Array.from({length:100},(_,i)=>({...item(i+1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(NOW).toISOString()}))};
   const result=await updateCatalog(previous,{getText:mockSource,now:NOW,delayMs:0,detailLimit:5,recentPages:2,backfillPages:2});
   assert.ok(result.items.length>100);assert.ok(result.items.some(x=>x.videoId==='201'));assert.ok(result.items.some(x=>x.videoId==='1'));
   assert.equal(result.backfill.nextPage,5);assert.equal(result.summary.detailRefreshed,5);
