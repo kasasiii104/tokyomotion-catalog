@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
 
 export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
@@ -183,7 +184,7 @@ export function mergeItems(...lists) {
   return [...map.values()];
 }
 
-export function detailQueue(items,now,limit=100) {
+export function detailQueue(items,now,limit=240) {
   const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
   const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>Number(b.videoId)-Number(a.videoId));
   const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
@@ -201,7 +202,7 @@ export async function fetchText(url) {
   return text;
 }
 
-export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),backfillPages=2,detailLimit=100,delayMs=300}={}) {
+export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,backfillPages=12,detailLimit=240,delayMs=300}={}) {
   let accessBlocked=false;
   const errors=[];
   const request=async url=>{
@@ -214,11 +215,13 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   catch(error){errors.push({stage:"rss",reason:error.message});}
   const listings=[];
   let successfulListings=0;
-  for(const page of [1,2]) {
+  for(let page=1;page<=recentPages;page++) {
     try{const result=parseListing(await request(page===1?SOURCE:`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);listings.push(...result.items);successfulListings++;}
     catch(error){errors.push({stage:"recent",page,reason:error.message});if(accessBlocked)break;}
   }
-  const backfill={nextPage:3,complete:false,...previous.backfill},startPage=backfill.nextPage;
+  const backfill={nextPage:recentPages+1,complete:false,...previous.backfill};
+  backfill.nextPage=Math.max(recentPages+1,backfill.nextPage);
+  const startPage=backfill.nextPage;
   let processedPages=0;
   for(let i=0;i<backfillPages&&!backfill.complete&&!accessBlocked;i++) {
     const page=backfill.nextPage;
@@ -228,7 +231,10 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     }catch(error){errors.push({stage:"backfill",page,reason:error.message});break;}
   }
   if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
-  let items=mergeItems(migrateItems(previous),listings,feed);
+  const previousAudit=filterJapanese(migrateItems(previous));
+  const candidates=mergeItems(migrateItems(previous),listings,feed);
+  const discoveryAudit=filterJapanese(candidates);
+  let items=discoveryAudit.accepted;
   const queue=detailQueue(items,now,detailLimit),details=[];
   for(const item of queue) {
     if(accessBlocked)break;
@@ -241,10 +247,16 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
       if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
     }
   }
-  items=mergeItems(items,details).map(item=>({...item,categories:item.categories||[]}));
+  const finalAudit=filterJapanese(mergeItems(items,details));
+  items=finalAudit.accepted.map(item=>({...item,categories:item.categories||[]}));
   items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
+  const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
+  const rejected=[...discoveryAudit.rejected,...finalAudit.rejected],reasons={};
+  for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
   return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,
-    summary:{total:items.length,newItems:items.length-new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl))).size,
+    languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting:previousAudit.rejected.length,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+previousAudit.rejected.length,reasons},
+    collection:{recentPages,backfillPages,detailLimit},
+    summary:{total:items.length,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
       detailRefreshed:details.length,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION).length,withImages:items.filter(x=>x.image).length,
       withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
