@@ -23,7 +23,11 @@ export function loadImage(url,signal) {
 }
 
 export class PreviewController {
-  constructor({load=loadImage,schedule=setTimeout,cancel=clearTimeout}={}) {this.load=load;this.schedule=schedule;this.cancel=cancel;this.active=null}
+  constructor({load=loadImage,schedule=setTimeout,cancel=clearTimeout}={}) {
+    this.load=load;
+    // Browser timers reject a PreviewController receiver (Illegal invocation).
+    this.schedule=(fn,ms)=>schedule(fn,ms);this.cancel=id=>cancel(id);this.active=null;
+  }
   toggle(key,spec,callbacks) {
     if(this.active?.key===key){if(this.active.playing)this.pause();else this.resume();return}
     this.stop();

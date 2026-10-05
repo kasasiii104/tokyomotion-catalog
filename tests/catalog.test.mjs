@@ -168,6 +168,11 @@ test('client accepts only declared frames of the same work',()=>{
   assert.equal(previewSpec({...item(1),preview:previewData}).urls.length,20);
   for(const patch of [{videoId:'2'},{availability:'unavailable'},{preview:{...previewData,count:99}},{preview:{...previewData,baseUrl:'https://example.com/media/videos/tmb75/1/'}}])assert.equal(previewSpec({...item(1),preview:previewData,...patch}),null);
 });
+test('browser timer functions are called without a controller receiver',async()=>{
+  let schedules=0,cancels=0;
+  const c=new PreviewController({load:async()=>{},schedule:function(){assert.equal(this,undefined);schedules++;return 1},cancel:function(){assert.equal(this,undefined);cancels++}});
+  c.toggle('one',{urls:['one','two'],interval:700},{});await tick();c.pause();c.stop();assert.ok(schedules>=2);assert.ok(cancels>=2);
+});
 test('tap starts, next tap freezes, next tap resumes without a close control',async()=>{
   const {controller:c,timers,advance}=controllerHarness();let frame='',status='';
   const spec=previewSpec({...item(1),preview:previewData}),handlers={onFrame:u=>frame=u,onState:s=>status=s};

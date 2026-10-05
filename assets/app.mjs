@@ -1,5 +1,5 @@
 import {PAGE_SIZE,escapeHTML as esc,safeUrl,stats,prepareItems,selectItems} from './catalog-core.mjs';
-import {PreviewController,previewSpec} from './preview-controller.mjs';
+import {PreviewController,previewSpec} from './preview-controller.mjs?v=20261005-preview2';
 
 const $=id=>document.getElementById(id);
 function stored(key){try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'):[]}catch{return []}}
