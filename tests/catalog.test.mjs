@@ -5,7 +5,8 @@ import vm from 'node:vm';
 import { classifyTitle, filterJapanese } from '../assets/language.mjs';
 import { PAGE_SIZE, escapeHTML, stats, safeUrl, prepareItems, selectItems } from '../assets/catalog-core.mjs';
 import { PreviewController, previewSpec } from '../assets/preview-controller.mjs';
-import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, mergeItems, detailQueue, updateCatalog } from '../scripts/update.mjs';
+import { auditContent, contentExclusionReasons } from '../assets/content-filter.mjs';
+import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, mergeItems, detailQueue, updateCatalog, pruneCatalog } from '../scripts/update.mjs';
 
 const NOW=Date.parse('2026-10-04T10:00:00Z');
 const url=id=>`${SOURCE}/video/${id}/test`;
@@ -231,7 +232,9 @@ async function uiHarness(){
     querySelectorAll(){return []}
     querySelector(selector){return ({'.media':this.media,'[data-preview]':this.button,'img':this.image,'.preview-indicator':this.indicator})[selector]||new Element('button')}
   }
-  const nodes=new Map(),events={};const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};get('sort').value='new';
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]));
+  const nodes=new Map(),events={};const get=id=>{assert.ok(ids.has(id),`Missing DOM element: ${id}`);if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};get('sort').value='new';
   class TestController extends PreviewController{constructor(){super({load:async()=>{},schedule:()=>1,cancel(){}})}}
   const ctx=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],addEventListener:(key,fn)=>events[key]=fn},window:{scrollY:123,scrollTo(){},addEventListener(){}},localStorage:{getItem:()=>'{invalid',setItem(){}},URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},PAGE_SIZE,esc:escapeHTML,safeUrl,stats,prepareItems,selectItems,PreviewController:TestController,previewSpec});
   const script=(await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'').replace(/load\(\);\s*$/,'');vm.runInContext(script,ctx);
@@ -265,4 +268,85 @@ test('unavailable work never starts preview or mounts a full player',async()=>{
 });
 test('backgrounding the page pauses rather than continuing preview requests',async()=>{
   const {ctx,makeCard,events}=await uiHarness();ctx.firstCard=makeCard(1);vm.runInContext('togglePreview(firstCard)',ctx);await tick();ctx.document.hidden=true;events.visibilitychange();assert.equal(ctx.firstCard.button.dataset.state,'paused');
+});
+
+test('content policy handles explicit label variants and every metadata field',()=>{
+  for(const label of ['FC2PPV-1234567','ＦＣ２－ＰＰＶ－１２３４５６７','f c 2 p p v 1234567','fc2_1234567','FC2\u200b-PPV','FC2&#45;PPV']) {
+    for(const field of ['title','description','categories','tags']) {
+      assert.deepEqual(contentExclusionReasons({[field]:['categories','tags'].includes(field)?[label]:label}),['fc2ppv'],`${field}: ${label}`);
+    }
+  }
+  for(const title of ['男の娘のテスト','男 ノ 娘','おとこの娘','オトコノ娘','otokonoko','Otoko-no-ko','FEMBOY','femboys'])assert.deepEqual(contentExclusionReasons({title}),['otokonoko'],title);
+  assert.deepEqual(contentExclusionReasons({title:'FC2-PPV 男の娘のテスト'}),['fc2ppv','otokonoko']);
+});
+test('content policy does not guess genre or combine separate fields into a label',()=>{
+  for(const title of ['男の子のテスト','女の子のテスト','女装のテスト','FC2ブログの説明','FC2 ライブの説明','FC2 18 のテスト','テストのPPV','ABCFC2PPVXYZ'])assert.deepEqual(contentExclusionReasons({title}),[],title);
+  assert.deepEqual(contentExclusionReasons({title:'FC2',description:'PPV'}),[]);
+  assert.deepEqual(contentExclusionReasons({image:'https://example.com/femboy.jpg'}),[]);
+});
+test('audit rejects every duplicate of a blocked ID and retains only ID and reason',()=>{
+  const result=auditContent([{...item(1),title:'FC2-PPV テスト'},item(1),item(2)]);
+  assert.deepEqual(result.accepted.map(x=>x.videoId),['2']);
+  assert.deepEqual(result.excludedItems,[{videoId:'1',reasons:['fc2ppv']}]);
+  assert.equal(result.rejected.length,1);
+  assert.equal(auditContent([item(1)],result.excludedItems).accepted.length,0);
+});
+test('offline cleanup preserves permitted works, counters, collection time and all crawl cursors',()=>{
+  const keep={...item(1),date:NOW,views:234,likes:9,dislikes:2,preview:previewData};
+  const previous={updatedAt:'2026-10-01T00:00:00Z',backfill:{nextPage:65},previewAudit:{nextPage:20},summary:{newItems:3,rssItems:20},items:[keep,{...item(2),title:'FC2-PPV テスト'},{...item(3),categories:['男の娘']},{...item(4),description:'男の娘 FC2-PPV のテスト'}]};
+  const snapshot=structuredClone(previous),result=pruneCatalog(previous,NOW);
+  assert.deepEqual(previous,snapshot);assert.deepEqual(result.items,[keep]);
+  for(const key of ['updatedAt','backfill','previewAudit'])assert.deepEqual(result[key],previous[key]);
+  assert.equal(result.summary.total,1);assert.equal(result.summary.withViews,1);assert.equal(result.summary.newItems,0);
+  assert.equal(result.contentPolicy.removedExisting,3);assert.deepEqual(result.contentPolicy.lastRemoval.reasons,{fc2ppv:2,otokonoko:2});
+  const again=pruneCatalog(result,NOW+1000);
+  assert.deepEqual(again.items,result.items);assert.equal(again.contentPolicy.removedExisting,0);assert.equal(again.contentPolicy.removedExistingTotal,3);assert.deepEqual(again.contentPolicy.lastRemoval,result.contentPolicy.lastRemoval);
+});
+test('old, new, archive and renamed works are blocked before any detail request',async()=>{
+  const requests=[],previous={items:[{...item(1),title:'FC2-PPV テスト'}]};
+  const getText=async u=>{
+    requests.push(u);
+    if(u===RSS_URL)return rss(1);
+    if(u===SOURCE)return listing(202).replaceAll('テスト作品 202','男の娘のテスト');
+    if(u.includes('/page='))return listing(203,0).replaceAll('テスト作品 203','ＦＣ２－ＰＰＶ テスト');
+    throw new Error('blocked details must not be requested');
+  };
+  const result=await updateCatalog(previous,{getText,now:NOW,delayMs:0,recentPages:1,backfillPages:1,previewAuditPages:0});
+  assert.equal(result.items.length,0);assert.ok(!requests.some(u=>u.includes('/video/')));
+  assert.equal(result.contentPolicy.removedExisting,1);assert.equal(result.contentPolicy.excludedItems.length,3);
+  const second=await updateCatalog(result,{getText:async u=>u===RSS_URL?rss(1):listing(202,0),now:NOW+1000,delayMs:0,recentPages:1,backfillPages:0,previewAuditPages:0,detailLimit:0});
+  assert.equal(second.items.length,0);assert.equal(second.contentPolicy.removedExistingTotal,1);
+});
+test('raw RSS and detail descriptions are checked before Japanese-only display cleanup',async()=>{
+  const feed=parseFeed(rss().replace('</item>','<description>FC2-PPV</description></item>'));
+  assert.deepEqual(contentExclusionReasons(feed[0]),['fc2ppv']);
+  const html=detail()+'<meta property="og:description" content="femboy">';
+  const parsed=parseDetail(html,NOW,'201');
+  assert.equal(parsed.description,'');assert.deepEqual(contentExclusionReasons(parsed),['otokonoko']);
+  const result=await updateCatalog({items:[]},{getText:async u=>u.includes('/video/')?html:mockSource(u),now:NOW,delayMs:0,recentPages:1,backfillPages:0,previewAuditPages:0});
+  assert.equal(result.items.length,0);assert.equal(result.contentPolicy.excludedItems.length,2);
+});
+test('new labels discovered during preview audit also remove the existing entry before details',async()=>{
+  const requests=[],previous={items:[item(1)],backfill:{nextPage:9,complete:true},previewAudit:{version:PREVIEW_VERSION,nextPage:7,endPage:8,complete:false}};
+  const result=await updateCatalog(previous,{getText:async u=>{requests.push(u);return u.includes('page=7')?listing(1,8).replaceAll('テスト作品 1','男の娘のテスト'):mockSource(u)},now:NOW,delayMs:0,recentPages:1,backfillPages:0,previewAuditPages:1});
+  assert.ok(!result.items.some(x=>x.videoId==='1'));assert.ok(!requests.includes(url(1)));assert.equal(result.contentPolicy.removedExisting,1);
+});
+test('client removes stale blocked data from every browse mode including favorites and history',()=>{
+  const items=prepareItems([item(1),{...item(2),title:'FC2-PPV テスト'},{...item(3),tags:['男の娘']},item(4)],[{videoId:'4',reasons:['fc2ppv']}]);
+  assert.deepEqual(items.map(x=>x.videoId),['1']);
+  for(const view of ['home','recent','popular','rated','archive','favorites','history'])assert.deepEqual(selectItems(items,{view,favorites:new Set(['video:1','video:2','video:3','video:4']),history:['video:4','video:3','video:2','video:1']}).map(x=>x.videoId),['1']);
+});
+test('home intro and CTA are gone and home rendering has no missing DOM reference',async()=>{
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  for(const text of ['あなたのカタログ','気になったら、タップ。','サムネで画像プレビュー。もう一度タップで停止。','タイトルから詳細、本編は大きなプレイヤーで。','新着をチェック','id="hero"','id="browse-new"'])assert.ok(!html.includes(text),text);
+  const {ctx,nodes}=await uiHarness();vm.runInContext('render()',ctx);
+  assert.equal(nodes.get('shelf-section').hidden,false);assert.match(nodes.get('grid').innerHTML,/grid:video:1/);
+});
+test('load applies tombstones and safely closes any removed detail or watch view',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  vm.runInContext('openDetails(samples[0]);openWatch(samples[0]);',ctx);
+  ctx.fetch=async()=>({ok:true,json:async()=>({items:[item(1),item(2)],contentPolicy:{excludedItems:[{videoId:'1',reasons:['fc2ppv']}]} })});
+  await vm.runInContext('load()',ctx);
+  assert.equal(vm.runInContext('state.byId.has("video:1")',ctx),false);assert.equal(vm.runInContext('state.watch',ctx),null);
+  assert.equal(nodes.get('watch-view').hidden,true);assert.equal(nodes.get('browse-view').hidden,false);
 });

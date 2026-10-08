@@ -7,6 +7,7 @@ on:
       - 'scripts/**'
       - 'tests/**'
       - 'assets/language.mjs'
+      - 'assets/content-filter.mjs'
       - '.github/workflows/update-catalog.yml'
   schedule:
     - cron: "*/30 * * * *"
@@ -35,7 +36,11 @@ jobs:
           node-version: 22
       - name: Test parsers, accumulation, backfill and UI
         run: node --test tests/catalog.test.mjs
+      - name: Remove excluded works without accessing the source
+        if: github.event_name == 'push'
+        run: node scripts/update.mjs --prune-only
       - name: Fetch Japanese titles, 6 recent pages, 12 archive pages and up to 240 details
+        if: github.event_name != 'push'
         run: node scripts/update.mjs
       - name: Commit changed catalog data
         run: |

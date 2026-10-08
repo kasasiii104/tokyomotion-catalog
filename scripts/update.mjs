@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { classifyTitle, filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
+import { auditContent, contentId, contentExclusionReasons, CONTENT_POLICY_VERSION } from "../assets/content-filter.mjs";
 
 export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
@@ -92,7 +93,9 @@ export function parseFeed(xml) {
     const parsedDate=Date.parse(tagText(block,"pubDate")||tagText(block,"published"));
     const date=Number.isFinite(parsedDate)?parsedDate:0;
     const imageTag=block.match(/<(?:media:thumbnail|enclosure)\b[^>]*>/i)?.[0]||"";
-    return [{id:`video:${videoKey(url)}`,videoId:videoKey(url),sourceUrl:url,title:tagText(block,"title"),
+    const title=tagText(block,"title"),description=tagText(block,"description");
+    return [{id:`video:${videoKey(url)}`,videoId:videoKey(url),sourceUrl:url,title,
+      contentExclusions:contentExclusionReasons({title,description}),
       image:imageUrl(attr(imageTag,"url")),embedUrl:embedUrl(block),
       categories:[...block.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/gi)].map(x=>stripMarkup(decode(x[1]))).filter(Boolean),
       date,dateSource:date?"rss":"unknown",dateLabel:dateLabel(date)}];
@@ -167,7 +170,7 @@ export function parseDetail(html,now=Date.now(),videoId='') {
   const title=meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,"");
   const rawDescription=stripMarkup(meta(html,'og:description')).slice(0,2000);
   const description=rawDescription!==title&&classifyTitle(rawDescription).keep?rawDescription:'';
-  return {title,description,image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
+  return {title,description,contentExclusions:contentExclusionReasons({title,description:rawDescription}),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
     ...(preview?{preview}:{}),previewVersion:PREVIEW_VERSION,
     embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
     likes,dislikes,ratingPercent:likes!=null&&dislikes!=null&&likes+dislikes>0?100*likes/(likes+dislikes):null,
@@ -221,6 +224,33 @@ export async function fetchText(url) {
   return text;
 }
 
+function contentPolicy(previous,audit,now) {
+  const excluded=new Map(audit.excludedItems.map(x=>[x.videoId,x.reasons]));
+  const removed=[...new Set((previous.items||[]).map(contentId))].filter(id=>excluded.has(id));
+  const reasons={fc2ppv:0,otokonoko:0},removedReasons={fc2ppv:0,otokonoko:0};
+  for(const row of audit.excludedItems)for(const reason of row.reasons)reasons[reason]++;
+  for(const id of removed)for(const reason of excluded.get(id))removedReasons[reason]++;
+  return {version:CONTENT_POLICY_VERSION,auditedAt:new Date(now).toISOString(),
+    removedExisting:removed.length,removedExistingTotal:(previous.contentPolicy?.removedExistingTotal||0)+removed.length,
+    lastRemoval:removed.length?{at:new Date(now).toISOString(),count:removed.length,reasons:removedReasons}:previous.contentPolicy?.lastRemoval||null,
+    reasons,excludedItems:audit.excludedItems};
+}
+
+function itemCounts(items) {
+  return {total:items.length,
+    pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION).length,
+    withImages:items.filter(x=>x.image).length,withPreviews:items.filter(x=>x.preview&&!['unavailable','not_found'].includes(x.availability)).length,
+    withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length};
+}
+
+// Offline cleanup preserves metadata, crawl cursors and the last collection time.
+// Only IDs and reasons are kept as tombstones, not removed titles or media URLs.
+export function pruneCatalog(previous={},now=Date.now()) {
+  const audit=auditContent(previous.items||[],previous.contentPolicy?.excludedItems);
+  return {...previous,contentPolicy:contentPolicy(previous,audit,now),
+    summary:{...previous.summary,...itemCounts(audit.accepted),newItems:0},items:audit.accepted};
+}
+
 export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,backfillPages=12,previewAuditPages=24,detailLimit=240,delayMs=300}={}) {
   let accessBlocked=false;
   const errors=[];
@@ -251,7 +281,8 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   }
   if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
   const previousAudit=filterJapanese(migrateItems(previous));
-  const candidates=mergeItems(migrateItems(previous),listings,feed);
+  let contentAudit=auditContent([...migrateItems(previous),...listings,...feed],previous.contentPolicy?.excludedItems);
+  const candidates=mergeItems(contentAudit.accepted);
   const discoveryAudit=filterJapanese(candidates);
   let items=discoveryAudit.accepted;
   // One bounded rescan of already-visited lists repairs old items without guessing image URLs.
@@ -263,6 +294,9 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     const page=previewAudit.nextPage;
     try{
       const result=parseListing(await request(`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);
+      contentAudit=auditContent([...items,...result.items],contentAudit.excludedItems);
+      const excluded=new Set(contentAudit.excludedItems.map(x=>x.videoId));
+      items=items.filter(x=>!excluded.has(x.videoId));
       for(const found of result.items){const old=existing.get(found.videoId);if(old&&found.preview&&!['unavailable','not_found'].includes(old.availability)){old.preview=found.preview;old.previewVersion=PREVIEW_VERSION}}
       previewAudit.nextPage=page+1;previewAuditProcessed++;previewAudit.complete=!result.hasNext||previewAudit.nextPage>previewAudit.endPage;
     }catch(error){errors.push({stage:'preview_audit',page,reason:error.message});break}
@@ -279,29 +313,31 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
       if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
     }
   }
-  const finalAudit=filterJapanese(mergeItems(items,details));
+  contentAudit=auditContent([...items,...details],contentAudit.excludedItems);
+  const finalAudit=filterJapanese(mergeItems(contentAudit.accepted));
   items=finalAudit.accepted.map(item=>({...item,categories:item.categories||[]}));
   items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
   const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
   const rejected=[...discoveryAudit.rejected,...finalAudit.rejected],reasons={};
   for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
   return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,
+    contentPolicy:contentPolicy(previous,contentAudit,now),
     languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting:previousAudit.rejected.length,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+previousAudit.rejected.length,reasons},
     collection:{recentPages,backfillPages,previewAuditPages,detailLimit},
-    summary:{total:items.length,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
+    summary:{...itemCounts(items),newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
-      detailRefreshed:details.length,previewAuditPages:previewAuditProcessed,pendingDetails:items.filter(x=>!x.detailCheckedAt||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION).length,withImages:items.filter(x=>x.image).length,withPreviews:items.filter(x=>x.preview&&!['unavailable','not_found'].includes(x.availability)).length,
-      withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length},errors,items};
+      detailRefreshed:details.length,previewAuditPages:previewAuditProcessed},errors,items};
 }
 
 async function main() {
   let previous={items:[]};
   try{previous=JSON.parse(await readFile(OUTPUT,"utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
-  const result=await updateCatalog(previous);
+  const result=process.argv.includes('--prune-only')?pruneCatalog(previous):await updateCatalog(previous);
   await mkdir(new URL("../data/",import.meta.url),{recursive:true});
   const temp=new URL(`${OUTPUT.href}.tmp`);
   await writeFile(temp,`${JSON.stringify(result,null,2)}\n`);await rename(temp,OUTPUT);
-  console.log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,errors:result.errors}));
+  const {excludedItems,...policy}=result.contentPolicy;
+  console.log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,contentPolicy:policy,errors:result.errors}));
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(error.message);process.exitCode=1;});

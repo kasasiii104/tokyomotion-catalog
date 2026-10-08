@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#101010">
   <title>MOTION | 日本語カタログ</title>
-  <link rel="stylesheet" href="assets/site.css?v=20261005-preview">
+  <link rel="stylesheet" href="assets/site.css?v=20261008-content1">
 </head>
 <body>
   <a class="skip-link" href="#main">作品一覧へ</a>
@@ -34,8 +34,7 @@
   <main id="main">
     <div id="browse-view">
     <nav class="chips" aria-label="表示切り替え"><button data-view="home" class="chip active">すべて</button><button data-view="recent" class="chip">新着</button><button data-view="popular" class="chip">人気</button><button data-view="rated" class="chip">高評価</button><button data-view="archive" class="chip">過去の作品</button><button data-view="favorites" class="chip">お気に入り</button><button data-view="history" class="chip">再生履歴</button></nav>
-    <section id="hero" class="hero"><div class="hero-copy"><div class="eyebrow"><span></span> あなたのカタログ</div><h1>気になったら、タップ。</h1><p>サムネで画像プレビュー。もう一度タップで停止。<br>タイトルから詳細、本編は大きなプレイヤーで。</p><button class="hero-button" id="browse-new">新着をチェック <span aria-hidden="true">↗</span></button></div><div class="hero-art" aria-hidden="true"><div class="film-card film-one"><i></i></div><div class="film-card film-two"><i></i></div><div class="film-card film-three"><i></i></div></div></section>
-    <div id="notice" class="notice" role="status" hidden></div>
+        <div id="notice" class="notice" role="status" hidden></div>
     <section id="shelf-section" class="shelf-section" aria-labelledby="shelf-title"><div class="section-head"><h2 id="shelf-title">いま人気の作品</h2><button id="all-popular" class="text-button">すべて見る <span aria-hidden="true">›</span></button></div><div class="shelf" id="shelf"></div></section>
     <section class="catalog-section" aria-labelledby="section-title"><div class="section-head catalog-head"><div><h2 id="section-title">新着の作品</h2><p id="count" class="count" aria-live="polite">読み込み中…</p></div><div class="filters"><label><span class="sr-only">カテゴリ</span><select id="category"><option value="">すべてのカテゴリ</option></select></label><label><span class="sr-only">並び順</span><select id="sort"><option value="new">新しい順</option><option value="old">古い順</option><option value="views">再生数順</option><option value="rating">高評価順</option><option value="title">タイトル順</option></select></label></div></div><div id="grid" class="grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="more-wrap"><button id="more" class="more-button" hidden>さらに36件を表示 <span aria-hidden="true">⌄</span></button></div></section>
     </div>
@@ -49,6 +48,6 @@
   </main>
   <dialog id="details" class="details-dialog" aria-labelledby="detail-title"><button id="detail-close" class="detail-close" aria-label="詳細を閉じる">×</button><div id="detail-content"></div></dialog>
   <noscript><p class="notice">作品一覧の表示にはJavaScriptを有効にしてください。</p></noscript>
-  <script type="module" src="assets/app.mjs?v=20261005-preview2"></script>
+  <script type="module" src="assets/app.mjs?v=20261008-content1"></script>
 </body>
 </html>
