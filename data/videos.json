@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-10-10T07:38:24.830Z",
+  "updatedAt": "2026-10-10T08:03:12.836Z",
   "source": "https://www.tokyomotion.net/rss",
   "backfill": {
     "nextPage": 101,
@@ -14,7 +14,7 @@
   },
   "contentPolicy": {
     "version": 1,
-    "auditedAt": "2026-10-10T07:38:24.830Z",
+    "auditedAt": "2026-10-10T08:03:12.836Z",
     "removedExisting": 0,
     "removedExistingTotal": 89,
     "lastRemoval": {
@@ -761,13 +761,14 @@
   "languagePolicy": {
     "version": 1,
     "mode": "japanese_titles_only",
-    "auditedAt": "2026-10-10T07:38:24.830Z",
-    "excludedThisRun": 34,
+    "auditedAt": "2026-10-10T08:03:12.836Z",
+    "excludedThisRun": 36,
     "removedExisting": 0,
     "removedExistingTotal": 280,
     "reasons": {
-      "english_title": 27,
-      "han_only_ambiguous": 7
+      "english_title": 28,
+      "han_only_ambiguous": 7,
+      "unverified_title": 1
     }
   },
   "collection": {
@@ -777,70 +778,165 @@
     "detailLimit": 240
   },
   "summary": {
-    "total": 3062,
+    "total": 3063,
     "pendingDetails": 0,
-    "withImages": 3061,
-    "withPreviews": 2226,
-    "withEmbeds": 2289,
-    "withViews": 3059,
-    "withVotes": 2289,
+    "withImages": 3062,
+    "withPreviews": 2225,
+    "withEmbeds": 2288,
+    "withViews": 3060,
+    "withVotes": 2288,
     "newItems": 1,
     "rssItems": 20,
-    "listingItems": 65,
+    "listingItems": 72,
     "backfillFrom": 101,
     "backfillPages": 0,
-    "detailRefreshed": 105,
+    "detailRefreshed": 142,
     "previewAuditPages": 0
   },
   "errors": [
     {
       "stage": "detail",
-      "videoId": "7057186",
+      "videoId": "7048700",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7057178",
+      "videoId": "7048548",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7057041",
+      "videoId": "7048547",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7056088",
+      "videoId": "7048536",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7054212",
+      "videoId": "7048418",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7054173",
+      "videoId": "7048572",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7054263",
+      "videoId": "7048565",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7052592",
+      "videoId": "7044424",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7052711",
+      "videoId": "7044414",
       "reason": "HTTP_404"
     },
     {
       "stage": "detail",
-      "videoId": "7052639",
+      "videoId": "7044398",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7044253",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7044235",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7044233",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7044071",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7044063",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043980",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043861",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043697",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043695",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043842",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043836",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043828",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043684",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043671",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043647",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043640",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7043616",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7054391",
+      "reason": "HTTP_404"
+    },
+    {
+      "stage": "detail",
+      "videoId": "7052866",
       "reason": "HTTP_404"
     }
   ],
@@ -857,7 +953,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060673/1.jpg",
@@ -865,9 +961,9 @@
       "date": 1791613441000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 0,
+      "views": 1001,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/4eb97f15b1b52a9380ab",
       "titleLanguage": "ja",
@@ -893,7 +989,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060667/1.jpg",
@@ -903,7 +999,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/12804e40bc8ac838fb53",
       "titleLanguage": "ja",
@@ -929,7 +1025,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060629/1.jpg",
@@ -939,7 +1035,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/ca8333a35013f99cc0bb",
       "titleLanguage": "ja",
@@ -965,7 +1061,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060626/1.jpg",
@@ -974,8 +1070,8 @@
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
       "views": 0,
-      "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "ratingPercent": 100,
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/2f53802cdb39327bc893",
       "titleLanguage": "ja",
@@ -1001,17 +1097,17 @@
         "posterIndex": 13,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
-      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060617/default.jpg",
+      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060617/13.jpg",
       "categories": [],
       "date": 1791612715000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
       "views": 0,
-      "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "ratingPercent": 100,
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/16c3ee1538e85d8c43dc",
       "titleLanguage": "ja",
@@ -1037,7 +1133,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060610/1.jpg",
@@ -1047,7 +1143,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/d322340201e579554575",
       "titleLanguage": "ja",
@@ -1109,17 +1205,17 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:05:20.327Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
-      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060558/default.jpg",
+      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060558/1.jpg",
       "categories": [],
       "date": 1791612320327,
       "dateSource": "relative",
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:05:20.327Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -1145,17 +1241,17 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:05:20.327Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
-      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060555/default.jpg",
+      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060555/1.jpg",
       "categories": [],
       "date": 1791612320327,
       "dateSource": "relative",
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:05:20.327Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -1181,17 +1277,17 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:05:20.327Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
-      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060552/default.jpg",
+      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060552/1.jpg",
       "categories": [],
       "date": 1791612320327,
       "dateSource": "relative",
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:05:20.327Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -1217,7 +1313,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060524/1.jpg",
@@ -1227,7 +1323,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -1253,7 +1349,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060503/1.jpg",
@@ -1263,7 +1359,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -1289,7 +1385,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060593/1.jpg",
@@ -1299,7 +1395,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/46630f183e7b3b5ca454",
       "titleLanguage": "ja",
@@ -1350,6 +1446,42 @@
       "lastError": null
     },
     {
+      "id": "video:7060535",
+      "videoId": "7060535",
+      "sourceUrl": "https://www.tokyomotion.net/video/7060535/short-%E5%90%8C%E7%AA%93%E4%BC%9A%E3%81%8B%E3%82%89%E5%A7%8B%E3%81%BE%E3%81%A3%E3%81%9F%E8%A3%8F%E5%88%87%E3%82%8Antr-%E6%9C%80%E4%BD%8E%E3%82%AF%E3%82%BA%E5%85%83%E5%BD%BC%E3%81%AE%E7%B5%B6%E5%80%AB%E3%83%94%E3%82%B9%E3%83%88%E3%83%B3%E3%81%AB10%E5%B9%B4%E3%81%B6%E3%82%8A%E3%81%AB%E6%BB%85%E8%8C%B6%E8%8B%A6%E8%8C%B6%E7%8B%82%E3%82%8F%E3%81%95%E3%82%8C%E4%BA%BA%E7%94%9F%E3%81%A7%E4%B8%80%E7%95%AA%E4%B9%B1%E3%82%8C%E5%A0%95%E3%81%A1%E3%81%9F%E6%9C%80%E4%BD%8E%E3%81%AA%E7%A7%81-%E9%87%91%E6%9D%BE%E5%AD%A3%E6%AD%A9",
+      "title": "-Short-同窓会から始まった裏切りNTR 最低クズ元彼の絶倫ピストンに10年ぶりに滅茶苦茶狂わされ人生で一番乱れ堕ちた最低な私。～金松季歩～",
+      "preview": {
+        "type": "images",
+        "baseUrl": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060535/",
+        "count": 20,
+        "posterIndex": 1,
+        "intervalMs": 700,
+        "source": "official_thumbnail_rotation",
+        "checkedAt": "2026-10-10T08:03:12.836Z"
+      },
+      "previewVersion": 1,
+      "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060535/default.jpg",
+      "categories": [],
+      "date": 1791612192836,
+      "dateSource": "relative",
+      "dateLabel": "2026/10/10",
+      "views": 0,
+      "ratingPercent": 100,
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
+      "titleLanguage": "ja",
+      "languagePolicyVersion": 1,
+      "description": "",
+      "contentExclusions": [],
+      "embedUrl": "https://www.tokyomotion.net/embed/3e9924d415b960507e91",
+      "availability": "embed_available",
+      "likes": 1,
+      "dislikes": 0,
+      "statsVersion": 2,
+      "ratingVersion": 1,
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
+      "lastError": null
+    },
+    {
       "id": "video:7060570",
       "videoId": "7060570",
       "sourceUrl": "https://www.tokyomotion.net/video/7060570/%E8%8E%89%E6%9C%88-%E3%82%8A%E3%81%9A-m%E7%94%B7-2",
@@ -1397,7 +1529,7 @@
         "posterIndex": 4,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060559/4.jpg",
@@ -1407,7 +1539,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/311f7c9c93c2e53e586a",
       "titleLanguage": "ja",
@@ -1433,7 +1565,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:05:20.327Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060548/1.jpg",
@@ -1443,7 +1575,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:05:20.327Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/22e7b8aac884521821f4",
       "titleLanguage": "ja",
@@ -1505,7 +1637,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060545/1.jpg",
@@ -1515,7 +1647,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/c2055a64e7b56b275e13",
       "titleLanguage": "ja",
@@ -1541,7 +1673,7 @@
         "posterIndex": 12,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060531/12.jpg",
@@ -1551,7 +1683,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/fefce7f49ed6dd112e19",
       "titleLanguage": "ja",
@@ -1577,7 +1709,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060526/1.jpg",
@@ -1587,7 +1719,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/3fab3218f76818bc6fa4",
       "titleLanguage": "ja",
@@ -1613,7 +1745,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060525/1.jpg",
@@ -1623,7 +1755,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/596a4a38ec95608d31e3",
       "titleLanguage": "ja",
@@ -1649,7 +1781,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060519/1.jpg",
@@ -1659,7 +1791,7 @@
       "dateLabel": "2026/10/10",
       "views": 1000,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/9e17da5f1861f891dbce",
       "titleLanguage": "ja",
@@ -1719,7 +1851,7 @@
       "views": 0,
       "likes": 0,
       "dislikes": 0,
-      "ratingPercent": null,
+      "ratingPercent": 100,
       "statsVersion": 2,
       "ratingVersion": 1,
       "detailCheckedAt": "2026-10-10T06:03:48.019Z",
@@ -1731,9 +1863,9 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z"
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z"
     },
     {
       "id": "video:7060498",
@@ -1767,9 +1899,9 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z"
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z"
     },
     {
       "id": "video:7060492",
@@ -1803,9 +1935,9 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z"
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z"
     },
     {
       "id": "video:7060479",
@@ -1819,7 +1951,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060479/1.jpg",
@@ -1829,7 +1961,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/8ed2e3184133357bcde9",
       "titleLanguage": "ja",
@@ -1855,7 +1987,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060462/1.jpg",
@@ -1863,9 +1995,9 @@
       "date": 1791609642000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 1000,
+      "views": 2000,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/bfb4b650d11a4550ef3f",
       "titleLanguage": "ja",
@@ -1891,7 +2023,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060461/1.jpg",
@@ -1901,7 +2033,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 0,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/1df2c6a624520bfe38ae",
       "titleLanguage": "ja",
@@ -1927,7 +2059,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060440/1.jpg",
@@ -1937,7 +2069,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/e2e8616c0d9ce76c89fd",
       "titleLanguage": "ja",
@@ -1963,7 +2095,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060435/1.jpg",
@@ -1973,7 +2105,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/d860310dc395d5f5759c",
       "titleLanguage": "ja",
@@ -1999,7 +2131,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060420/1.jpg",
@@ -2009,7 +2141,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/4ac88c7c37742921d480",
       "titleLanguage": "ja",
@@ -2035,7 +2167,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060416/1.jpg",
@@ -2043,9 +2175,9 @@
       "date": 1791609253000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 0,
+      "views": 1000,
       "ratingPercent": 100,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/46ceebae899c3333d3fa",
       "titleLanguage": "ja",
@@ -2143,7 +2275,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060356/1.jpg",
@@ -2153,7 +2285,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -2179,7 +2311,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060355/1.jpg",
@@ -2189,7 +2321,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -2215,7 +2347,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060354/1.jpg",
@@ -2225,7 +2357,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -2251,7 +2383,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060353/1.jpg",
@@ -2261,7 +2393,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -2287,7 +2419,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060352/1.jpg",
@@ -2297,7 +2429,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -2323,7 +2455,7 @@
         "posterIndex": 1,
         "intervalMs": 700,
         "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-10T07:38:24.830Z"
+        "checkedAt": "2026-10-10T08:03:12.836Z"
       },
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7060346/1.jpg",
@@ -2333,7 +2465,7 @@
       "dateLabel": "2026/10/10",
       "views": 0,
       "ratingPercent": null,
-      "listingCheckedAt": "2026-10-10T07:38:24.830Z",
+      "listingCheckedAt": "2026-10-10T08:03:12.836Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
@@ -8878,7 +9010,7 @@
       "date": 1791573343000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 3000,
+      "views": 4000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-09T21:04:45.413Z",
       "contentExclusions": [],
@@ -8887,11 +9019,11 @@
       "languagePolicyVersion": 1,
       "description": "",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 3,
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -8950,7 +9082,7 @@
       "date": 1791571564000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 1000,
+      "views": 2000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-09T21:04:45.413Z",
       "contentExclusions": [],
@@ -8963,7 +9095,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -8986,7 +9118,7 @@
       "date": 1791571245000,
       "dateSource": "rss",
       "dateLabel": "2026/10/10",
-      "views": 1000,
+      "views": 2000,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-09T21:04:45.413Z",
       "contentExclusions": [],
@@ -8999,7 +9131,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -9007,15 +9139,7 @@
       "videoId": "7058407",
       "sourceUrl": "https://www.tokyomotion.net/video/7058407/%E3%82%8F%E3%82%93%E3%81%93-%E3%83%95%E3%82%A7%E3%83%86%E3%82%A3%E3%83%83%E3%82%B7%E3%83%A5",
       "title": "わんこ フェティッシュ",
-      "preview": {
-        "type": "images",
-        "baseUrl": "https://cdn.tokyo-motion.net/media/videos/tmb220/7058407/",
-        "count": 20,
-        "posterIndex": 1,
-        "intervalMs": 700,
-        "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-09T21:04:45.413Z"
-      },
+      "preview": null,
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7058407/default.jpg",
       "categories": [],
@@ -9029,13 +9153,13 @@
       "languagePolicyVersion": 1,
       "description": "",
       "contentExclusions": [],
-      "embedUrl": "https://www.tokyomotion.net/embed/5e651d7155d11edf0f02",
-      "availability": "embed_available",
-      "likes": 0,
-      "dislikes": 0,
+      "embedUrl": "",
+      "availability": "unavailable",
+      "likes": null,
+      "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -9410,8 +9534,8 @@
       "date": 1791567558996,
       "dateSource": "relative",
       "dateLabel": "2026/10/10",
-      "views": 2000,
-      "ratingPercent": 100,
+      "views": 3001,
+      "ratingPercent": 83.33333333333333,
       "listingCheckedAt": "2026-10-09T19:39:18.996Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -9419,11 +9543,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/72e3bcd4c0779ebdd1f7",
       "availability": "embed_available",
-      "likes": 2,
-      "dislikes": 0,
+      "likes": 5,
+      "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -12330,7 +12454,7 @@
       "date": 1791549856000,
       "dateSource": "rss",
       "dateLabel": "2026/10/9",
-      "views": 1400,
+      "views": 1000,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-09T15:05:59.169Z",
       "contentExclusions": [],
@@ -12343,7 +12467,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -13099,15 +13223,7 @@
       "videoId": "7057119",
       "sourceUrl": "https://www.tokyomotion.net/video/7057119/49%E6%AD%B3-%E4%B8%89%E5%85%90%E3%81%AE%E6%AF%8D",
       "title": "49歳 三児の母",
-      "preview": {
-        "type": "images",
-        "baseUrl": "https://cdn.tokyo-motion.net/media/videos/tmb220/7057119/",
-        "count": 20,
-        "posterIndex": 1,
-        "intervalMs": 700,
-        "source": "official_thumbnail_rotation",
-        "checkedAt": "2026-10-09T13:41:42.701Z"
-      },
+      "preview": null,
       "previewVersion": 1,
       "image": "https://cdn.tokyo-motion.net/media/videos/tmb220/7057119/default.jpg",
       "categories": [],
@@ -13115,19 +13231,19 @@
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
       "views": 6000,
-      "ratingPercent": 100,
+      "ratingPercent": null,
       "listingCheckedAt": "2026-10-09T13:41:42.701Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "contentExclusions": [],
-      "embedUrl": "https://www.tokyomotion.net/embed/b0a97ef58724ca845089",
-      "availability": "embed_available",
-      "likes": 7,
-      "dislikes": 0,
+      "embedUrl": "",
+      "availability": "unavailable",
+      "likes": null,
+      "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -13163,7 +13279,7 @@
       "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -13186,7 +13302,7 @@
       "date": 1791547722806,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 5000,
+      "views": 7000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-09T13:08:42.806Z",
       "titleLanguage": "ja",
@@ -13195,11 +13311,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/7fb09593a0aff975dae6",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 3,
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -13222,7 +13338,7 @@
       "date": 1791547722806,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 1000,
+      "views": 2000,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-09T13:08:42.806Z",
       "titleLanguage": "ja",
@@ -13235,7 +13351,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23373,7 +23489,7 @@
       "date": 1791483935000,
       "dateSource": "rss",
       "dateLabel": "2026/10/9",
-      "views": 1700,
+      "views": 1000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-08T21:39:38.403Z",
       "contentExclusions": [],
@@ -23386,7 +23502,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23409,7 +23525,7 @@
       "date": 1791483530000,
       "dateSource": "rss",
       "dateLabel": "2026/10/9",
-      "views": 1300,
+      "views": 1000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-08T21:39:38.403Z",
       "contentExclusions": [],
@@ -23422,7 +23538,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23517,8 +23633,8 @@
       "date": 1791481935000,
       "dateSource": "rss",
       "dateLabel": "2026/10/9",
-      "views": 9000,
-      "ratingPercent": 84.61538461538461,
+      "views": 10000,
+      "ratingPercent": 80,
       "listingCheckedAt": "2026-10-08T20:41:02.045Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/f91908d451659b7ca407",
@@ -23526,11 +23642,11 @@
       "languagePolicyVersion": 1,
       "description": "アリシア 中出し",
       "availability": "embed_available",
-      "likes": 11,
-      "dislikes": 2,
+      "likes": 12,
+      "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23558,7 +23674,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -23594,7 +23710,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23630,7 +23746,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23653,7 +23769,7 @@
       "date": 1791481546747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 1000,
+      "views": 2100,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-08T20:41:02.045Z",
       "titleLanguage": "ja",
@@ -23666,7 +23782,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23689,7 +23805,7 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 800,
+      "views": 0,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-08T20:41:02.045Z",
       "titleLanguage": "ja",
@@ -23702,7 +23818,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23738,7 +23854,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23766,7 +23882,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23802,7 +23918,7 @@
       "dislikes": 198,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23825,7 +23941,7 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 300,
+      "views": 400,
       "ratingPercent": 0,
       "listingCheckedAt": "2026-10-08T20:41:02.045Z",
       "titleLanguage": "ja",
@@ -23838,7 +23954,7 @@
       "dislikes": 197,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23861,7 +23977,7 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 300,
+      "views": 0,
       "ratingPercent": 0,
       "listingCheckedAt": "2026-10-08T20:41:02.045Z",
       "titleLanguage": "ja",
@@ -23874,7 +23990,7 @@
       "dislikes": 197,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23910,7 +24026,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23942,11 +24058,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/09ad813bfd7dcc35760d",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 2,
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -23969,7 +24085,7 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 3000,
+      "views": 4000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
@@ -23978,11 +24094,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/8f4ef0e6d605adccc086",
       "availability": "embed_available",
-      "likes": 11,
+      "likes": 12,
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24005,8 +24121,8 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 1000,
-      "ratingPercent": 66.66666666666667,
+      "views": 1500,
+      "ratingPercent": 80,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -24014,11 +24130,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/00bab63f4d58ebacf401",
       "availability": "embed_available",
-      "likes": 2,
+      "likes": 4,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24042,7 +24158,7 @@
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
       "views": 2000,
-      "ratingPercent": 0,
+      "ratingPercent": 50,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -24050,11 +24166,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/2f02c71b4536a2910790",
       "availability": "embed_available",
-      "likes": 0,
+      "likes": 1,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24086,11 +24202,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/e787524edfb1fc0dc8a7",
       "availability": "embed_available",
-      "likes": 4,
+      "likes": 5,
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24113,8 +24229,8 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 1000,
-      "ratingPercent": 75,
+      "views": 1100,
+      "ratingPercent": 80,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -24122,11 +24238,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/ff4a59ff968f7dd6d951",
       "availability": "embed_available",
-      "likes": 3,
+      "likes": 4,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24150,7 +24266,7 @@
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
       "views": 1000,
-      "ratingPercent": 50,
+      "ratingPercent": 75,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -24158,11 +24274,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/c5c9491673ed54e5353a",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 3,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24185,7 +24301,7 @@
       "date": 1791481486747,
       "dateSource": "relative",
       "dateLabel": "2026/10/9",
-      "views": 300,
+      "views": 0,
       "ratingPercent": 0,
       "listingCheckedAt": "2026-10-08T19:06:39.742Z",
       "titleLanguage": "ja",
@@ -24198,7 +24314,7 @@
       "dislikes": 197,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -24234,7 +24350,7 @@
       "dislikes": 197,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30438,13 +30554,13 @@
       "description": "拾い",
       "previewVersion": 1,
       "availability": "embed_available",
-      "views": 7000,
-      "likes": 2,
+      "views": 7400,
+      "likes": 3,
       "dislikes": 2,
-      "ratingPercent": 50,
+      "ratingPercent": 60,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "preview": {
         "type": "images",
@@ -30477,8 +30593,8 @@
       "date": 1791458459000,
       "dateSource": "rss",
       "dateLabel": "2026/10/8",
-      "views": 124215,
-      "ratingPercent": 37.5,
+      "views": 136316,
+      "ratingPercent": 39.39393939393939,
       "listingCheckedAt": "2026-10-08T13:10:03.047Z",
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/196060995a78091f407b",
@@ -30486,11 +30602,11 @@
       "languagePolicyVersion": 1,
       "description": "動画サンプルリストあります",
       "availability": "embed_available",
-      "likes": 12,
+      "likes": 13,
       "dislikes": 20,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30516,7 +30632,7 @@
       "ratingPercent": 100,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "preview": {
         "type": "images",
@@ -30562,7 +30678,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30598,7 +30714,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30634,7 +30750,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30657,8 +30773,8 @@
       "date": 1791457546620,
       "dateSource": "relative",
       "dateLabel": "2026/10/8",
-      "views": 1200,
-      "ratingPercent": 50,
+      "views": 1000,
+      "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-08T12:47:55.780Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -30666,11 +30782,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/e46d386af7504725984b",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 2,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30693,8 +30809,8 @@
       "date": 1791457546620,
       "dateSource": "relative",
       "dateLabel": "2026/10/8",
-      "views": 5001,
-      "ratingPercent": 0,
+      "views": 6001,
+      "ratingPercent": 25,
       "listingCheckedAt": "2026-10-08T12:47:55.780Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -30702,11 +30818,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/fb44c3ce45cd996981a0",
       "availability": "embed_available",
-      "likes": 0,
-      "dislikes": 2,
+      "likes": 1,
+      "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30734,7 +30850,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30770,7 +30886,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30806,7 +30922,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30830,7 +30946,7 @@
       "dateSource": "relative",
       "dateLabel": "2026/10/8",
       "views": 9000,
-      "ratingPercent": 50,
+      "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-08T12:47:55.780Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
@@ -30838,11 +30954,11 @@
       "contentExclusions": [],
       "embedUrl": "https://www.tokyomotion.net/embed/56b844b4f74dc58753e3",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 2,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30878,7 +30994,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30906,7 +31022,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -30929,7 +31045,7 @@
       "date": 1791457472000,
       "dateSource": "rss",
       "dateLabel": "2026/10/8",
-      "views": 1701,
+      "views": 1000,
       "ratingPercent": 100,
       "listingCheckedAt": "2026-10-08T13:10:03.047Z",
       "contentExclusions": [],
@@ -30942,7 +31058,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -30965,7 +31081,7 @@
       "date": 1791457380000,
       "dateSource": "rss",
       "dateLabel": "2026/10/8",
-      "views": 0,
+      "views": 900,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-08T13:10:03.047Z",
       "contentExclusions": [],
@@ -30978,7 +31094,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -31014,7 +31130,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -31034,13 +31150,13 @@
       "description": "",
       "previewVersion": 1,
       "availability": "embed_available",
-      "views": 1000,
+      "views": 1600,
       "likes": 1,
       "dislikes": 4,
       "ratingPercent": 20,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "preview": {
         "type": "images",
@@ -31076,7 +31192,7 @@
       "ratingPercent": 85.71428571428571,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "preview": {
         "type": "images",
@@ -31112,7 +31228,7 @@
       "ratingPercent": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-10T01:39:41.183Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "preview": null,
       "listingCheckedAt": "2026-10-08T12:47:55.780Z"
@@ -48616,7 +48732,7 @@
       "date": 1791374325000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 1700,
+      "views": 1800,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/2ac0f1dfecb76d8a3fe1",
@@ -48628,7 +48744,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48652,7 +48768,7 @@
       "date": 1791374322000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 4000,
+      "views": 5000,
       "ratingPercent": 80,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/8e94b48d5d97739c37d9",
@@ -48664,7 +48780,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48700,7 +48816,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48736,7 +48852,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48772,7 +48888,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48796,19 +48912,19 @@
       "date": 1791373740000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3000,
-      "ratingPercent": 66.66666666666667,
+      "views": 4000,
+      "ratingPercent": 75,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/1dad7c2b7fd932526a04",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "availability": "embed_available",
-      "likes": 2,
+      "likes": 3,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48832,7 +48948,7 @@
       "date": 1791373671718,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 400,
+      "views": 500,
       "ratingPercent": 0,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
@@ -48844,7 +48960,7 @@
       "dislikes": 196,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48868,7 +48984,7 @@
       "date": 1791373535000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3000,
+      "views": 4400,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/4b7db65f2bb0a48786f6",
@@ -48880,7 +48996,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -48980,7 +49096,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49003,19 +49119,19 @@
       "date": 1791372939000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 11000,
-      "ratingPercent": 71.42857142857143,
+      "views": 12000,
+      "ratingPercent": 77.77777777777777,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/620e85cfd47f208fab07",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "availability": "embed_available",
-      "likes": 5,
+      "likes": 7,
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49039,7 +49155,7 @@
       "date": 1791372715000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 1300,
+      "views": 1500,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/b422813c062ac16fb775",
@@ -49051,7 +49167,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49087,7 +49203,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49111,7 +49227,7 @@
       "date": 1791372576000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3000,
+      "views": 3300,
       "ratingPercent": 75,
       "listingCheckedAt": "2026-10-07T13:40:26.497Z",
       "embedUrl": "https://www.tokyomotion.net/embed/e6fd1a69203bebd9a2f7",
@@ -49123,7 +49239,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49147,7 +49263,7 @@
       "date": 1791372370000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3700,
+      "views": 3800,
       "ratingPercent": 75,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "embedUrl": "https://www.tokyomotion.net/embed/0dc886aad91b0cbf5faf",
@@ -49159,7 +49275,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49183,7 +49299,7 @@
       "date": 1791371524000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3000,
+      "views": 4000,
       "ratingPercent": 0,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "embedUrl": "https://www.tokyomotion.net/embed/79c780ae09a69d303da9",
@@ -49195,7 +49311,7 @@
       "dislikes": 15,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49231,7 +49347,7 @@
       "dislikes": 5,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49255,7 +49371,7 @@
       "date": 1791371464000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3400,
+      "views": 3000,
       "ratingPercent": 75,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "embedUrl": "https://www.tokyomotion.net/embed/ddcfda5ce97d121dfdad",
@@ -49267,7 +49383,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49291,7 +49407,7 @@
       "date": 1791371381000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 7000,
+      "views": 9000,
       "ratingPercent": 85.71428571428571,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "embedUrl": "https://www.tokyomotion.net/embed/f7227a5dae389e70dae2",
@@ -49303,7 +49419,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49331,7 +49447,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49358,7 +49474,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49393,7 +49509,7 @@
       "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49421,7 +49537,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49444,7 +49560,7 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 4000,
+      "views": 5000,
       "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
@@ -49456,7 +49572,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49480,7 +49596,7 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 4003,
+      "views": 5203,
       "ratingPercent": 55.55555555555556,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
@@ -49492,7 +49608,7 @@
       "dislikes": 4,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49516,19 +49632,19 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 10000,
-      "ratingPercent": 88.88888888888889,
+      "views": 11000,
+      "ratingPercent": 90,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "embedUrl": "https://www.tokyomotion.net/embed/62480e3cfa9e559d9275",
       "availability": "embed_available",
-      "likes": 8,
+      "likes": 9,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49552,19 +49668,19 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 6000,
-      "ratingPercent": 87.5,
+      "views": 7000,
+      "ratingPercent": 88.88888888888889,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "マンカス デカクリ娘",
       "embedUrl": "https://www.tokyomotion.net/embed/4b2f4ad90fd89bc3201a",
       "availability": "embed_available",
-      "likes": 7,
+      "likes": 8,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49588,7 +49704,7 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 800,
+      "views": 1000,
       "ratingPercent": 25,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
@@ -49600,7 +49716,7 @@
       "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49624,7 +49740,7 @@
       "date": 1791371157346,
       "dateSource": "relative",
       "dateLabel": "2026/10/7",
-      "views": 1200,
+      "views": 1000,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "titleLanguage": "ja",
@@ -49636,7 +49752,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49664,7 +49780,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404",
       "contentExclusions": []
     },
@@ -49688,7 +49804,7 @@
       "date": 1791371058000,
       "dateSource": "rss",
       "dateLabel": "2026/10/7",
-      "views": 3000,
+      "views": 3300,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-07T13:09:27.187Z",
       "embedUrl": "https://www.tokyomotion.net/embed/656faf11c1550f3bdd27",
@@ -49700,7 +49816,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49736,7 +49852,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49764,7 +49880,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49791,7 +49907,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -49826,7 +49942,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -49854,7 +49970,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -49881,7 +49997,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -65973,7 +66089,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66000,7 +66116,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66027,7 +66143,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -66062,7 +66178,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66090,7 +66206,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66581,8 +66697,8 @@
       "date": 1791283351000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 2500,
-      "ratingPercent": 60,
+      "views": 2800,
+      "ratingPercent": 50,
       "listingCheckedAt": "2026-10-06T11:38:32.691Z",
       "embedUrl": "https://www.tokyomotion.net/embed/690569221d71ee382947",
       "titleLanguage": "ja",
@@ -66590,10 +66706,10 @@
       "description": "",
       "availability": "embed_available",
       "likes": 3,
-      "dislikes": 2,
+      "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66621,7 +66737,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66680,7 +66796,7 @@
       "date": 1791283122000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 1300,
+      "views": 1400,
       "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "embedUrl": "https://www.tokyomotion.net/embed/f6c3aec93cdfedb32c9b",
@@ -66692,7 +66808,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66728,7 +66844,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66756,7 +66872,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66783,7 +66899,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -66806,19 +66922,19 @@
       "date": 1791282600000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 8000,
-      "ratingPercent": 85.71428571428571,
+      "views": 9000,
+      "ratingPercent": 90,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "embedUrl": "https://www.tokyomotion.net/embed/eefb9d220dd6d5569574",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "availability": "embed_available",
-      "likes": 6,
+      "likes": 9,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66843,18 +66959,18 @@
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
       "views": 5000,
-      "ratingPercent": 80,
+      "ratingPercent": 83.33333333333333,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "embedUrl": "https://www.tokyomotion.net/embed/c2f64616f3a7364f0bf1",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "メンヘラの個撮です。",
       "availability": "embed_available",
-      "likes": 4,
+      "likes": 5,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66878,7 +66994,7 @@
       "date": 1791282178000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 6100,
+      "views": 6000,
       "ratingPercent": 83.33333333333333,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "embedUrl": "https://www.tokyomotion.net/embed/6714a67a89ad2128ee78",
@@ -66890,7 +67006,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66914,7 +67030,7 @@
       "date": 1791282041000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 2600,
+      "views": 2000,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "embedUrl": "https://www.tokyomotion.net/embed/6741d057ac4fd0d1371a",
@@ -66926,7 +67042,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66962,7 +67078,7 @@
       "dislikes": 30,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -66998,7 +67114,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67026,7 +67142,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -67049,7 +67165,7 @@
       "date": 1791281440664,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 2300,
+      "views": 2000,
       "ratingPercent": 80,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "titleLanguage": "ja",
@@ -67061,7 +67177,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67085,7 +67201,7 @@
       "date": 1791281320664,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 5000,
+      "views": 6000,
       "ratingPercent": 75,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "titleLanguage": "ja",
@@ -67097,7 +67213,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67125,7 +67241,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -67160,7 +67276,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67188,7 +67304,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -67211,7 +67327,7 @@
       "date": 1791281140664,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 12000,
+      "views": 13000,
       "ratingPercent": 60,
       "listingCheckedAt": "2026-10-06T12:05:01.975Z",
       "titleLanguage": "ja",
@@ -67223,7 +67339,7 @@
       "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67251,7 +67367,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -67274,19 +67390,19 @@
       "date": 1791281080664,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 5002,
-      "ratingPercent": 87.5,
+      "views": 6002,
+      "ratingPercent": 88.88888888888889,
       "listingCheckedAt": "2026-10-06T11:38:32.691Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "",
       "embedUrl": "https://www.tokyomotion.net/embed/8456b175cca8c3ed48cf",
       "availability": "embed_available",
-      "likes": 7,
+      "likes": 8,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67310,7 +67426,7 @@
       "date": 1791281080664,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 0,
+      "views": 900,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-06T11:04:40.664Z",
       "titleLanguage": "ja",
@@ -67322,7 +67438,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -67350,7 +67466,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -67377,7 +67493,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68007,7 +68123,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68034,7 +68150,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68057,19 +68173,19 @@
       "date": 1791279552000,
       "dateSource": "rss",
       "dateLabel": "2026/10/6",
-      "views": 600,
-      "ratingPercent": 50,
+      "views": 700,
+      "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-06T11:04:40.664Z",
       "embedUrl": "https://www.tokyomotion.net/embed/aca048be918a01e5b411",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "M女を調教 あずみ",
       "availability": "embed_available",
-      "likes": 1,
+      "likes": 2,
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68097,7 +68213,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68124,7 +68240,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68151,7 +68267,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68178,7 +68294,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68205,7 +68321,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68232,7 +68348,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68254,13 +68370,13 @@
       "languagePolicyVersion": 1,
       "description": "可愛い子とすると本能的にこっそり中出ししてしまいがち",
       "embedUrl": "",
-      "availability": "unavailable",
+      "availability": "not_found",
       "likes": null,
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
-      "lastError": null
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
+      "lastError": "HTTP_404"
     },
     {
       "id": "video:7043629",
@@ -68294,7 +68410,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68318,7 +68434,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 1400,
+      "views": 1600,
       "ratingPercent": 50,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68330,7 +68446,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68354,7 +68470,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 2400,
+      "views": 2000,
       "ratingPercent": 88.88888888888889,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68366,7 +68482,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68402,7 +68518,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68430,7 +68546,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": "HTTP_404"
     },
     {
@@ -68453,7 +68569,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 1400,
+      "views": 1700,
       "ratingPercent": null,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68465,7 +68581,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68489,7 +68605,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 4000,
+      "views": 5000,
       "ratingPercent": 70,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68501,7 +68617,7 @@
       "dislikes": 3,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68525,7 +68641,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 1300,
+      "views": 1400,
       "ratingPercent": 75,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68537,7 +68653,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68573,7 +68689,7 @@
       "dislikes": 0,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68597,19 +68713,19 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 14016,
-      "ratingPercent": 83.33333333333333,
+      "views": 17016,
+      "ratingPercent": 75,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
       "languagePolicyVersion": 1,
       "description": "セフレとの動画を系50本どもっています。 こちらサンプル動画になりますので、その他動画購入や希望動画ありましたら https://x.com/moOtEwWyaTto1OJまでお願いします。",
       "embedUrl": "https://www.tokyomotion.net/embed/f67b485b4d392a2be6c7",
       "availability": "embed_available",
-      "likes": 5,
-      "dislikes": 1,
+      "likes": 6,
+      "dislikes": 2,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68633,7 +68749,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 3300,
+      "views": 3000,
       "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68645,7 +68761,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
@@ -68673,7 +68789,7 @@
       "dislikes": null,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null
     },
     {
@@ -68696,7 +68812,7 @@
       "date": 1791275962196,
       "dateSource": "relative",
       "dateLabel": "2026/10/6",
-      "views": 1900,
+      "views": 2000,
       "ratingPercent": 66.66666666666667,
       "listingCheckedAt": "2026-10-06T10:39:22.196Z",
       "titleLanguage": "ja",
@@ -68708,7 +68824,7 @@
       "dislikes": 1,
       "statsVersion": 2,
       "ratingVersion": 1,
-      "detailCheckedAt": "2026-10-09T07:41:02.679Z",
+      "detailCheckedAt": "2026-10-10T08:03:12.836Z",
       "lastError": null,
       "contentExclusions": []
     },
