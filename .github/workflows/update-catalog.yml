@@ -1,3 +1,12 @@
+# 対象: .github/workflows/update-catalog.yml
+# 元: baseline 58cb245
+# H1（補助）: cron を毎時7分・37分へ分散。
+# スケジュールの遅延・間引きの原因は未確定。分散は緩和の補助
+# H2: 収集ステップに id、古い固定件数を名前から除去。既定の通知・終了コードを維持。
+# L2: commit 後の pull --rebase → push を最大3回、5秒待って再試行。
+# L6: checkout の資格情報保存を無効化し、pull/push 専用ステップだけ token を env で渡す。
+# L7: fetch-depth: 0 を維持。浅い clone は判断事項（rebase の検証が先）。
+# L6（判断事項）: Actions の SHA 固定は未実施。既存の @v4 等を維持。
 name: Update TokyoMotion catalog
 
 on:
@@ -10,11 +19,8 @@ on:
       - 'assets/content-filter.mjs'
       - '.github/workflows/update-catalog.yml'
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 concurrency:
   group: update-tokyomotion-catalog
@@ -22,6 +28,9 @@ concurrency:
 
 jobs:
   update:
+    # L6: カタログを push するため job の contents: write は必要。
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,6 +38,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          persist-credentials: false
+          # L7: 浅い clone は判断事項（rebase の検証が先）。
           fetch-depth: 0
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -37,17 +48,43 @@ jobs:
       - name: Test parsers, accumulation, backfill and UI
         run: node --test tests/catalog.test.mjs
       - name: Remove excluded works without accessing the source
+        id: prune
         if: github.event_name == 'push'
         run: node scripts/update.mjs --prune-only
-      - name: Fetch Japanese titles, 6 recent pages, 12 archive pages and up to 240 details
+      # H2: 既定は緑のまま注釈・GITHUB_STEP_SUMMARY で見える化。
+      # --strict で重度の部分失敗を赤にするかは ゆう の判断事項。
+      # --allow-shrink は付けず、件数急減時の保存ガードを維持する。
+      - name: Fetch Japanese titles and catalog details
+        id: collect
         if: github.event_name != 'push'
         run: node scripts/update.mjs
       - name: Commit changed catalog data
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/videos.json
           git diff --cached --quiet && exit 0
           git commit -m "chore: update TokyoMotion catalog"
-          git pull --rebase origin main
-          git push
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+      # 変更が無い回は元どおり pull/push しない。
+      - name: Rebase and push catalog with retries
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}"
+          for attempt in 1 2 3; do
+            if git pull --rebase "$remote_url" main && git push "$remote_url" HEAD:main; then
+              exit 0
+            fi
+            # rebase 競合後も元のローカルコミットを保持して再試行できる状態に戻す。
+            if test -d "$(git rev-parse --git-path rebase-merge)" || test -d "$(git rev-parse --git-path rebase-apply)"; then
+              git rebase --abort
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep 5
+            fi
+          done
+          echo "::error::Catalog pull/rebase/push failed after 3 attempts"
+          exit 1
