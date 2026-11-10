@@ -1,8 +1,25 @@
+# 対象: .github/workflows/deploy-pages.yml
+# 元: baseline 58cb245
+# M3: update の paths 対象のみの push を除外。workflow_run と成功判定は維持。
+# M4①: index.html・assets/・data/ だけを _site/ にステージングして公開。
+# README・scripts・tests・_FETCH_MANIFEST.md は公開しない。
+# M4②: 失敗時は再実行前に Deploy ログの Current status: 遷移と
+# 未完了 deployment の有無を確認する（本件での原因は未確定）。
+# M4③: 状況を確認したうえで workflow_dispatch（Run workflow）で再実行する。
+# L6（判断事項）: Actions の SHA 固定は未実施。既存の @v4 等を維持。
 name: Deploy TokyoMotion catalog
 
 on:
   push:
     branches: [main]
+    # M3: この対象だけの push は update → workflow_run 経由でテスト通過後に配信。
+    # 対象内外の両方にまたがる push では従来どおり2本走る限界がある。
+    paths-ignore:
+      - 'scripts/**'
+      - 'tests/**'
+      - 'assets/language.mjs'
+      - 'assets/content-filter.mjs'
+      - '.github/workflows/update-catalog.yml'
   workflow_dispatch:
   workflow_run:
     workflows: ["Update TokyoMotion catalog"]
@@ -33,10 +50,15 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      - name: Stage public site
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          cp -R assets data _site/
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
