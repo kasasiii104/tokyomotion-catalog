@@ -81,17 +81,20 @@ function toggleFavorite(item){
 }
 async function load(){
   if(state.loading)return;state.loading=true;$('refresh').disabled=true;$('notice').hidden=true;
+  let timer;
   try{
-    const response=await fetch('data/videos.json?ts='+Date.now(),{cache:'no-store'});if(!response.ok)throw new Error('一覧を取得できませんでした（HTTP '+response.status+'）');
+    let signal;if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')signal=AbortSignal.timeout(30000);else if(typeof AbortController!=='undefined'){const controller=new AbortController();signal=controller.signal;timer=setTimeout(()=>controller.abort(),30000)}
+    const response=await fetch('data/videos.json',{cache:'no-cache',...(signal?{signal}:{})});if(!response.ok)throw new Error('一覧を取得できませんでした（HTTP '+response.status+'）');
     const data=await response.json();if(!Array.isArray(data.items))throw new Error('カタログの形式が不正です。');
-    previews.stop();state.data=data;state.items=prepareItems(data.items,data.contentPolicy?.excludedItems);state.byId=new Map(state.items.map(x=>[x.id,x]));
-    const previous=$('category').value,categories=[...new Set(state.items.flatMap(x=>x.categories))].sort((a,b)=>a.localeCompare(b,'ja'));
+    const items=prepareItems(data.items,data.contentPolicy?.excludedItems),byId=new Map(items.map(x=>[x.id,x]));
+    const previous=$('category').value,categories=[...new Set(items.flatMap(x=>x.categories))].sort((a,b)=>a.localeCompare(b,'ja'));
+    previews.stop();state.data=data;state.items=items;state.byId=byId;
     $('category').innerHTML='<option value="">すべてのカテゴリ</option>'+categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(categories.includes(previous))$('category').value=previous;render();
     if(state.detailId){const x=state.byId.get(state.detailId);if(x)$('detail-content').innerHTML=detailMarkup(x);else closeDetails()}
     if(state.watch&&!playable(state.byId.get(state.watch)||{}))showBrowse();
     if(data.errors?.length||data.updatedAt&&Date.now()-Date.parse(data.updatedAt)>3*3600000){$('notice').textContent='一部の取得失敗または更新の遅れがあります。最終取得時点の情報を表示しています。';$('notice').hidden=false}
-  }catch(error){$('notice').textContent=error.message;$('notice').hidden=false;if(!state.items.length){$('count').textContent='読み込みに失敗しました';$('grid').innerHTML='<div class="empty">右上の更新ボタンで再度読み込めます。</div>';$('shelf-section').hidden=true}}
-  finally{state.loading=false;$('refresh').disabled=false}
+  }catch(error){$('notice').textContent=['AbortError','TimeoutError'].includes(error.name)?'一覧の取得がタイムアウトしました':error.message;$('notice').hidden=false;if(!state.items.length){$('count').textContent='読み込みに失敗しました';$('grid').innerHTML='<div class="empty">右上の更新ボタンで再度読み込めます。</div>';$('shelf-section').hidden=true}}
+  finally{clearTimeout(timer);state.loading=false;$('refresh').disabled=false}
 }
 document.addEventListener('click',event=>{
   const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return}

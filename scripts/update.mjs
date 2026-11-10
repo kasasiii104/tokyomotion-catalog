@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { mkdir, readFile, writeFile, rename, appendFile } from "node:fs/promises";
+import { dirname } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { classifyTitle, filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
 import { auditContent, contentId, contentExclusionReasons, CONTENT_POLICY_VERSION } from "../assets/content-filter.mjs";
 
@@ -94,7 +95,7 @@ export function parseFeed(xml) {
     const date=Number.isFinite(parsedDate)?parsedDate:0;
     const imageTag=block.match(/<(?:media:thumbnail|enclosure)\b[^>]*>/i)?.[0]||"";
     const title=tagText(block,"title"),description=tagText(block,"description");
-    return [{id:`video:${videoKey(url)}`,videoId:videoKey(url),sourceUrl:url,title,
+    return [{id:`video:${videoKey(url)}`,videoId:videoKey(url),sourceUrl:url,title,titleSource:"rss",
       contentExclusions:contentExclusionReasons({title,description}),
       image:imageUrl(attr(imageTag,"url")),embedUrl:embedUrl(block),
       categories:[...block.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/gi)].map(x=>stripMarkup(decode(x[1]))).filter(Boolean),
@@ -132,16 +133,16 @@ export function parseListing(html,pageUrl,now=Date.now()) {
     const text=stripMarkup(block),views=text.match(/\b([\d,]+)\s+views\b/i),rating=text.match(/(?:^|\s)(\d{1,3})\s*%/);
     const date=parseRelativeDate(text,now);
     const preview=parseThumbnailPreview(img,anchor.key,now);
-    items.push({id:`video:${anchor.key}`,videoId:anchor.key,sourceUrl:anchor.url,title,...(preview?{preview,previewVersion:PREVIEW_VERSION}:{}),
+    items.push({id:`video:${anchor.key}`,videoId:anchor.key,sourceUrl:anchor.url,title,titleSource:"listing",...(preview?{preview,previewVersion:PREVIEW_VERSION}:{}),
       image:imageUrl(attr(img,"data-src")||attr(img,"data-original")||attr(img,"src"),pageUrl),categories:[],
       date,dateSource:date?"relative":"unknown",dateLabel:dateLabel(date),views:views?Number(views[1].replace(/,/g,"")):null,
       ratingPercent:rating && Number(rating[1])<=100?Number(rating[1]):null,listingCheckedAt:new Date(now).toISOString()});
   }
   if(!items.length)throw new Error("listing_empty_or_unavailable");
   const current=Number(pageUrl.match(/page=(\d+)/)?.[1]||1);
-  const hasNext=(section.match(/<a\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,"href"),pageUrl))
-    .some(url=>Number(url.match(/[?\/]page=(\d+)/)?.[1]||0)>current);
-  return {items,hasNext};
+  const pages=(section.match(/<a\b[^>]*>/gi)||[]).map(tag=>normalizeUrl(attr(tag,"href"),pageUrl)).map(url=>url.match(/[?\/]page=(\d+)/)?.[1]).filter(page=>page!==undefined);
+  const pagerFound=pages.length>0,hasNext=pages.some(page=>Number(page)>current);
+  return {items,hasNext,pagerFound};
 }
 
 export function parseDetail(html,now=Date.now(),videoId='') {
@@ -170,7 +171,7 @@ export function parseDetail(html,now=Date.now(),videoId='') {
   const title=meta(html,"og:title").replace(/\s+-\s+TOKYO Motion\s*$/i,"");
   const rawDescription=stripMarkup(meta(html,'og:description')).slice(0,2000);
   const description=rawDescription!==title&&classifyTitle(rawDescription).keep?rawDescription:'';
-  return {title,description,contentExclusions:contentExclusionReasons({title,description:rawDescription}),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
+  return {title,titleSource:"detail",description,contentExclusions:contentExclusionReasons({title,description:rawDescription}),image:imageUrl(meta(html,"og:image")||meta(html,"twitter:image")),
     ...(preview?{preview}:{}),previewVersion:PREVIEW_VERSION,
     embedUrl:embed,availability:"embed_available",views:viewMatch?Number(viewMatch[1].replace(/,/g,"")):null,
     likes,dislikes,ratingPercent:likes!=null&&dislikes!=null&&likes+dislikes>0?100*likes/(likes+dislikes):null,
@@ -188,13 +189,17 @@ export function migrateItems(data) {
 }
 
 export function mergeItems(...lists) {
-  const map=new Map(),dateRank={unknown:0,relative:1,rss:2,official:3};
+  const map=new Map(),dateRank={unknown:0,relative:1,rss:2,official:3},titleRank={rss:0,listing:1,detail:2};
   for(const item of lists.flat()) {
     const url=sourceUrl(item.sourceUrl),key=videoKey(url);
     if(!key)continue;
     const old=map.get(key),result={...old,...item,id:old?.id||item.id||`video:${key}`,videoId:key,sourceUrl:url,
       categories:[...new Set([...(old?.categories||[]),...(item.categories||[])])]};
     for(const field of ["title","image","embedUrl"])if(!item[field] && old?.[field] && !["unavailable","not_found"].includes(item.availability))result[field]=old[field];
+    result.titleSource=item.titleSource||"listing";
+    if(old?.title && !["unavailable","not_found"].includes(item.availability) && (!item.title || titleRank[result.titleSource]<titleRank[old.titleSource||"listing"])) {
+      result.title=old.title;result.titleSource=old.titleSource||"listing";
+    }
     if(old?.date && (!item.date||(dateRank[old.dateSource]||0)>=(dateRank[item.dateSource]||0))) {
       result.date=old.date;result.dateSource=old.dateSource;result.dateLabel=old.dateLabel;
     }
@@ -207,9 +212,9 @@ export function mergeItems(...lists) {
 }
 
 export function detailQueue(items,now,limit=240) {
-  const due=items.filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
-  const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>Number(b.videoId)-Number(a.videoId));
-  const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
+  const due=items.filter(x=>!(x.detailFailures>0&&now-Date.parse(x.detailAttemptAt)<Math.min(2**(x.detailFailures-1),168)*HOUR)).filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
+  const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>(a.detailFailures||0)-(b.detailFailures||0)||Number(b.videoId)-Number(a.videoId));
+  const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>(a.detailFailures||0)-(b.detailFailures||0)||Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
   const selected=[...pending.slice(0,Math.max(1,Math.floor(limit*.65))),...refresh.slice(0,Math.max(1,Math.floor(limit*.35)))];
   const keys=new Set(selected.map(x=>x.videoId));
   for(const item of [...pending,...refresh])if(selected.length<limit&&!keys.has(item.videoId)){selected.push(item);keys.add(item.videoId);}
@@ -247,39 +252,72 @@ function itemCounts(items) {
 // Only IDs and reasons are kept as tombstones, not removed titles or media URLs.
 export function pruneCatalog(previous={},now=Date.now()) {
   const audit=auditContent(previous.items||[],previous.contentPolicy?.excludedItems);
+  const languageAudit=filterJapanese(audit.accepted),titles=new Set(languageAudit.accepted.map(x=>x.title)),items=audit.accepted.filter(x=>titles.has(x.title)),reasons={};
+  const removedExisting=languageAudit.rejected.length;
+  for(const x of languageAudit.rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
   return {...previous,contentPolicy:contentPolicy(previous,audit,now),
-    summary:{...previous.summary,...itemCounts(audit.accepted),newItems:0},items:audit.accepted};
+    languagePolicy:{...previous.languagePolicy,version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:removedExisting,removedExisting,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+removedExisting,reasons},
+    summary:{...previous.summary,...itemCounts(items),newItems:0},items};
 }
 
-export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,backfillPages=12,previewAuditPages=24,detailLimit=240,delayMs=300}={}) {
-  let accessBlocked=false;
-  const errors=[];
+export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,maxRecentPages=30,recentGapMaxDays=7,staleAfterMinutes=90,backfillPages=12,backfillRecheckDays=7,previewAuditPages=24,detailLimit=240,delayMs=300,timeBudgetMs=15*60*1000,clock=Date.now}={}) {
+  const startedAt=clock();
+  let accessBlocked=false,budgetExceeded=false;
+  const errors=[],warnings=[];
+  const previousNewestId=(previous.items||[]).reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},null);
+  const previousSeenId=Number.isFinite(previous.newestSeenId)&&previous.newestSeenId>0?previous.newestSeenId:null;
+  const defaultTargetId=previousNewestId===null?previousSeenId:Math.max(previousNewestId,previousSeenId||0);
+  let abandonedTargetId=null;
+  let recentGap=Number.isFinite(previous.recentGap?.targetId)&&previous.recentGap.targetId>0?previous.recentGap:null;
+  if(recentGap&&!Number.isFinite(Date.parse(recentGap.since)))recentGap={...recentGap,since:new Date(now).toISOString()};
+  if(recentGap&&now-Date.parse(recentGap.since)>=recentGapMaxDays*86400000){
+    warnings.push({stage:"recent_gap",reason:"gap_abandoned",targetId:recentGap.targetId,since:recentGap.since});
+    // Abandoned gaps may still be discovered by backfill.
+    abandonedTargetId=recentGap.targetId;recentGap=null;
+  }
+  const crawlTargetId=recentGap?.targetId??defaultTargetId;
+  const elapsed=previous.updatedAt?Math.floor((now-Date.parse(previous.updatedAt))/60000):null;
+  const minutesSinceLastRun=Number.isFinite(elapsed)?elapsed:null;
+  if(minutesSinceLastRun>staleAfterMinutes)warnings.push({stage:"schedule",reason:"run_gap",minutes:minutesSinceLastRun});
+  let recentPagesFetched=0,reachedPreviousNewest=crawlTargetId===null?null:false,lastRecent=null,recentFailed=false;
   const request=async url=>{
+    if(budgetExceeded||clock()-startedAt>timeBudgetMs){if(!budgetExceeded)errors.push({stage:"budget",reason:"time_budget_exceeded"});budgetExceeded=true;throw new Error("time_budget_exceeded");}
     if(accessBlocked)throw new Error("source_access_unavailable");
     try{return await getText(url);}catch(error){if([401,403,429].includes(error.status)||error.message==="source_access_unavailable")accessBlocked=true;throw error;}
     finally{if(delayMs)await new Promise(resolve=>setTimeout(resolve,delayMs));}
   };
   let feed=[];
   try{feed=parseFeed(await request(RSS_URL));if(!feed.length)throw new Error("rss_empty_or_changed");}
-  catch(error){errors.push({stage:"rss",reason:error.message});}
+  catch(error){if(!budgetExceeded)errors.push({stage:"rss",reason:error.message});}
   const listings=[];
   let successfulListings=0;
-  for(let page=1;page<=recentPages;page++) {
-    try{const result=parseListing(await request(page===1?SOURCE:`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);listings.push(...result.items);successfulListings++;}
-    catch(error){errors.push({stage:"recent",page,reason:error.message});if(accessBlocked)break;}
+  for(let page=1;!budgetExceeded&&(page<=recentPages||(page<=maxRecentPages&&crawlTargetId!==null&&!reachedPreviousNewest&&!recentFailed&&lastRecent?.hasNext));page++) {
+    recentPagesFetched++;
+    try{const result=parseListing(await request(page===1?SOURCE:`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);listings.push(...result.items);successfulListings++;lastRecent=result;if(crawlTargetId!==null&&result.items.some(item=>Number(item.videoId)<=crawlTargetId))reachedPreviousNewest=true;}
+    catch(error){if(budgetExceeded)break;recentFailed=true;lastRecent=null;errors.push({stage:"recent",page,reason:error.message});if(accessBlocked||page>recentPages)break;}
   }
+  recentGap=crawlTargetId!==null&&(abandonedTargetId===null||crawlTargetId>abandonedTargetId)&&(!reachedPreviousNewest||recentFailed||budgetExceeded||accessBlocked)?{targetId:crawlTargetId,since:recentGap?.since||new Date(now).toISOString()}:null;
+  if(recentGap)warnings.push({stage:"recent_gap",reason:"previous_newest_not_reached",pages:recentPagesFetched});
+  const recentPagesOk=successfulListings;
   const backfill={nextPage:recentPages+1,complete:false,...previous.backfill};
   backfill.nextPage=Math.max(recentPages+1,backfill.nextPage);
+  if(backfill.complete){
+    if(!backfill.completedAt)backfill.completedAt=new Date(now).toISOString();
+    else if(now-Date.parse(backfill.completedAt)>=backfillRecheckDays*86400000){backfill.complete=false;backfill.nextPage=Math.max(recentPages+1,backfill.nextPage-1);}
+  }
   const startPage=backfill.nextPage;
   let processedPages=0;
-  for(let i=0;i<backfillPages&&!backfill.complete&&!accessBlocked;i++) {
+  for(let i=0;i<backfillPages&&!backfill.complete&&!accessBlocked&&!budgetExceeded;i++) {
     const page=backfill.nextPage;
     try {
       const result=parseListing(await request(`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);
-      listings.push(...result.items);successfulListings++;processedPages++;backfill.nextPage=page+1;backfill.complete=!result.hasNext;
-    }catch(error){errors.push({stage:"backfill",page,reason:error.message});break;}
+      listings.push(...result.items);successfulListings++;processedPages++;
+      if(!result.hasNext&&!result.pagerFound){errors.push({stage:"backfill",page,reason:"pager_missing"});break;}
+      backfill.nextPage=page+1;backfill.complete=!result.hasNext;if(backfill.complete)backfill.completedAt=new Date(now).toISOString();
+    }catch(error){if(budgetExceeded)break;errors.push({stage:"backfill",page,reason:error.message});break;}
   }
   if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
+  const newestSeenId=[...feed,...listings].reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},previousSeenId);
   const previousAudit=filterJapanese(migrateItems(previous));
   let contentAudit=auditContent([...migrateItems(previous),...listings,...feed],previous.contentPolicy?.excludedItems);
   const candidates=mergeItems(contentAudit.accepted);
@@ -290,7 +328,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const auditEnd=Math.max(recentPages,Number(previous.backfill?.nextPage||recentPages+1)-1);
   const previewAudit=previous.previewAudit?.version===PREVIEW_VERSION?{...previous.previewAudit}:{version:PREVIEW_VERSION,nextPage:recentPages+1,endPage:auditEnd,complete:auditEnd<=recentPages};
   const existing=new Map(items.map(x=>[x.videoId,x]));let previewAuditProcessed=0;
-  for(let i=0;i<previewAuditPages&&!previewAudit.complete&&!accessBlocked;i++){
+  for(let i=0;i<previewAuditPages&&!previewAudit.complete&&!accessBlocked&&!budgetExceeded;i++){
     const page=previewAudit.nextPage;
     try{
       const result=parseListing(await request(`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);
@@ -298,19 +336,24 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
       const excluded=new Set(contentAudit.excludedItems.map(x=>x.videoId));
       items=items.filter(x=>!excluded.has(x.videoId));
       for(const found of result.items){const old=existing.get(found.videoId);if(old&&found.preview&&!['unavailable','not_found'].includes(old.availability)){old.preview=found.preview;old.previewVersion=PREVIEW_VERSION}}
+      if(!result.hasNext&&!result.pagerFound){errors.push({stage:"preview_audit",page,reason:"pager_missing"});break;}
       previewAudit.nextPage=page+1;previewAuditProcessed++;previewAudit.complete=!result.hasNext||previewAudit.nextPage>previewAudit.endPage;
-    }catch(error){errors.push({stage:'preview_audit',page,reason:error.message});break}
+    }catch(error){if(budgetExceeded)break;errors.push({stage:'preview_audit',page,reason:error.message});break}
   }
   const queue=detailQueue(items,now,detailLimit),details=[];
+  let detailAttempted=0;
   for(const item of queue) {
-    if(accessBlocked)break;
+    if(accessBlocked||budgetExceeded)break;
+    detailAttempted++;
     try {
       const detail=parseDetail(await request(item.sourceUrl),now,item.videoId);
       const keepDate=item.dateSource==="rss"&&detail.dateSource!=="official";
-      details.push({...item,...detail,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
+      details.push({...item,...detail,detailFailures:0,detailAttemptAt:null,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
     }catch(error){
+      if(budgetExceeded){detailAttempted--;break;}
       errors.push({stage:"detail",videoId:item.videoId,reason:error.message});
-      if(error.status===404)details.push({...item,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
+      if(error.status===404)details.push({...item,detailFailures:0,detailAttemptAt:null,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
+      else if(!accessBlocked)details.push({...item,detailFailures:(item.detailFailures||0)+1,detailAttemptAt:new Date(now).toISOString(),lastError:error.message});
     }
   }
   contentAudit=auditContent([...items,...details],contentAudit.excludedItems);
@@ -319,25 +362,59 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
   const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
   const rejected=[...discoveryAudit.rejected,...finalAudit.rejected],reasons={};
+  const finalIds=new Set(items.map(x=>x.videoId));
+  const removedExisting=new Set([...previousAudit.rejected,...rejected].map(x=>x.videoId).filter(id=>previousIds.has(id)&&!finalIds.has(id))).size;
   for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
-  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,
+  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,...(newestSeenId!==null?{newestSeenId}:previous.newestSeenId!==undefined?{newestSeenId:previous.newestSeenId}:{}),...(recentGap?{recentGap}:{}),
     contentPolicy:contentPolicy(previous,contentAudit,now),
-    languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting:previousAudit.rejected.length,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+previousAudit.rejected.length,reasons},
-    collection:{recentPages,backfillPages,previewAuditPages,detailLimit},
-    summary:{...itemCounts(items),newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
+    languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+removedExisting,reasons},
+    collection:{recentPages,maxRecentPages,backfillPages,previewAuditPages,detailLimit,timeBudgetMs},
+    summary:{...itemCounts(items),elapsedMs:clock()-startedAt,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
-      detailRefreshed:details.length,previewAuditPages:previewAuditProcessed},errors,items};
+      detailRefreshed:details.filter(x=>!x.detailFailures).length,detailFailed:details.filter(x=>x.detailFailures>0).length,recentPagesFetched,previousNewestId,crawlTargetId,reachedPreviousNewest,minutesSinceLastRun,recentPagesOk,detailAttempted,previewAuditPages:previewAuditProcessed},errors,warnings,items};
 }
 
-async function main() {
-  let previous={items:[]};
-  try{previous=JSON.parse(await readFile(OUTPUT,"utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
-  const result=process.argv.includes('--prune-only')?pruneCatalog(previous):await updateCatalog(previous);
-  await mkdir(new URL("../data/",import.meta.url),{recursive:true});
-  const temp=new URL(`${OUTPUT.href}.tmp`);
-  await writeFile(temp,`${JSON.stringify(result,null,2)}\n`);await rename(temp,OUTPUT);
-  const {excludedItems,...policy}=result.contentPolicy;
-  console.log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,contentPolicy:policy,errors:result.errors}));
+export function assessRun(result) {
+  const errors=result.errors||[],counts={},messages=[];
+  for(const error of errors)counts[error.stage]=(counts[error.stage]||0)+1;
+  if(!errors.length&&!(result.warnings||[]).length)return {level:"ok",counts,messages};
+  if(result.summary?.recentPagesOk===0&&(!counts.budget||counts.recent))messages.push("No recent pages succeeded");
+  if(errors.some(error=>/\bHTTP_(401|403|429)\b|source_access_unavailable/.test(error.reason)))messages.push("Source access blocked");
+  const attempted=result.summary?.detailAttempted||0;
+  if(attempted>0&&errors.filter(error=>error.stage==="detail"&&error.reason!=="HTTP_404").length===attempted)messages.push("All requested details failed without 404");
+  const level=messages.length?"severe":"degraded";
+  for(const warning of result.warnings||[])messages.push(`${warning.stage}: ${warning.reason}`);
+  return {level,counts,messages};
 }
 
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(error.message);process.exitCode=1;});
+export function validateForSave(result,previous,options={}) {
+  const {allowShrink=false,minPrevious=100,maxDropRatio=0.5,expectedSchema}={expectedSchema:SCHEMA_VERSION,...options};
+  if(result?.schemaVersion!==expectedSchema)return {ok:false,reason:"Invalid schemaVersion"};
+  if(!Array.isArray(result.items))return {ok:false,reason:"Invalid items: expected an array"};
+  if(result.items.some(item=>!item?.videoId||!item?.sourceUrl))return {ok:false,reason:"Invalid item: videoId and sourceUrl required"};
+  const before=Array.isArray(previous?.items)?previous.items.length:0,after=result.items.length;
+  if(!allowShrink&&before>=minPrevious&&after<before*(1-maxDropRatio))return {ok:false,reason:`Catalog item count dropped: previous=${before}, current=${after}`};
+  return {ok:true};
+}
+
+export async function runMain({argv=process.argv,output=OUTPUT,update=updateCatalog,prune=pruneCatalog,log=console.log,env=process.env}={}) {
+  try {
+    let previous={items:[]};
+    try{previous=JSON.parse(await readFile(output,"utf8"));}catch(error){if(error.code!=="ENOENT")throw error;}
+    const result=argv.includes('--prune-only')?await prune(previous):await update(previous);
+    const validation=validateForSave(result,previous,{allowShrink:argv.includes('--allow-shrink'),expectedSchema:argv.includes('--prune-only')?previous.schemaVersion:SCHEMA_VERSION});
+    if(!validation.ok){log(`::error title=Catalog save refused::${validation.reason}`);return 1;}
+    const target=output instanceof URL?fileURLToPath(output):output,temp=`${target}.tmp`;
+    await mkdir(dirname(target),{recursive:true});
+    await writeFile(temp,`${JSON.stringify(result,null,2)}\n`);await rename(temp,target);
+    const {excludedItems,...policy}=result.contentPolicy||{};
+    log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,contentPolicy:policy,errors:result.errors}));
+    const assessment=assessRun(result),summary=[Object.entries(assessment.counts).map(([stage,count])=>`${stage}=${count}`).join(", "),...assessment.messages].filter(Boolean).join("; ");
+    if(assessment.level!=="ok")log(`::${assessment.level==="severe"?"error title=Catalog collection degraded":"warning title=Catalog partially failed"}::${summary}`);
+    // The catalog is already saved; a summary write failure must not block the commit step.
+    if(env.GITHUB_STEP_SUMMARY)await appendFile(env.GITHUB_STEP_SUMMARY,`\n| Catalog health | Stage errors |\n| --- | --- |\n| ${assessment.level} | ${summary||"none"} |\n`).catch(error=>log(`::warning title=Step summary not written::${error.message}`));
+    return argv.includes('--strict')&&assessment.level==="severe"?2:0;
+  }catch(error){log(error.message);return 1;}
+}
+
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)runMain().then(code=>{process.exitCode=code},error=>{console.error(error.message);process.exitCode=1;});
