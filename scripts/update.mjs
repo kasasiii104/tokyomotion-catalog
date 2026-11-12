@@ -266,7 +266,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const errors=[],warnings=[];
   const previousNewestId=(previous.items||[]).reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},null);
   const previousSeenId=Number.isFinite(previous.newestSeenId)&&previous.newestSeenId>0?previous.newestSeenId:null;
-  const defaultTargetId=previousNewestId===null?previousSeenId:Math.max(previousNewestId,previousSeenId||0);
+  const defaultTargetId=previousSeenId??previousNewestId;
   let abandonedTargetId=null;
   let recentGap=Number.isFinite(previous.recentGap?.targetId)&&previous.recentGap.targetId>0?previous.recentGap:null;
   if(recentGap&&!Number.isFinite(Date.parse(recentGap.since)))recentGap={...recentGap,since:new Date(now).toISOString()};
@@ -296,6 +296,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     try{const result=parseListing(await request(page===1?SOURCE:`${SOURCE}/page=${page}`),`${SOURCE}/page=${page}`,now);listings.push(...result.items);successfulListings++;lastRecent=result;if(crawlTargetId!==null&&result.items.some(item=>Number(item.videoId)<=crawlTargetId))reachedPreviousNewest=true;}
     catch(error){if(budgetExceeded)break;recentFailed=true;lastRecent=null;errors.push({stage:"recent",page,reason:error.message});if(accessBlocked||page>recentPages)break;}
   }
+  const newestSeenId=recentFailed||budgetExceeded||accessBlocked?previousSeenId:listings.reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},previousSeenId);
   recentGap=crawlTargetId!==null&&(abandonedTargetId===null||crawlTargetId>abandonedTargetId)&&(!reachedPreviousNewest||recentFailed||budgetExceeded||accessBlocked)?{targetId:crawlTargetId,since:recentGap?.since||new Date(now).toISOString()}:null;
   if(recentGap)warnings.push({stage:"recent_gap",reason:"previous_newest_not_reached",pages:recentPagesFetched});
   const recentPagesOk=successfulListings;
@@ -317,7 +318,6 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     }catch(error){if(budgetExceeded)break;errors.push({stage:"backfill",page,reason:error.message});break;}
   }
   if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
-  const newestSeenId=[...feed,...listings].reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},previousSeenId);
   const previousAudit=filterJapanese(migrateItems(previous));
   let contentAudit=auditContent([...migrateItems(previous),...listings,...feed],previous.contentPolicy?.excludedItems);
   const candidates=mergeItems(contentAudit.accepted);
@@ -365,7 +365,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const finalIds=new Set(items.map(x=>x.videoId));
   const removedExisting=new Set([...previousAudit.rejected,...rejected].map(x=>x.videoId).filter(id=>previousIds.has(id)&&!finalIds.has(id))).size;
   for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
-  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,...(newestSeenId!==null?{newestSeenId}:previous.newestSeenId!==undefined?{newestSeenId:previous.newestSeenId}:{}),...(recentGap?{recentGap}:{}),
+  return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,...(newestSeenId!==null?{newestSeenId}:{}),...(recentGap?{recentGap}:{}),
     contentPolicy:contentPolicy(previous,contentAudit,now),
     languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+removedExisting,reasons},
     collection:{recentPages,maxRecentPages,backfillPages,previewAuditPages,detailLimit,timeBudgetMs},

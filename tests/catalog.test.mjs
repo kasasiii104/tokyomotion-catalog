@@ -710,13 +710,13 @@ test('recentGap: 全新着除外でも期限切れ目標を再作成せず次回
   const second=await updateCatalog(first,{...options,now:NOW+60000});
   assert.deepEqual(pages,[1,2,3,4,5,6]);assert.equal(second.summary.crawlTargetId,200);assert.equal(second.summary.reachedPreviousNewest,true);assert.equal('recentGap' in second,false);
 });
-test('newestSeenId: RSS・新着・backfillの除外作品を観測し次回基準とpruneで保持',async()=>{
+test('newestSeenId: 新着の除外作品だけを観測し次回基準とpruneで保持',async()=>{
   for(const [feedId,recentId,backfillId] of [[300,200,250],[200,300,250],[200,250,300]]){
     const options={now:NOW,delayMs:0,recentPages:1,maxRecentPages:1,backfillPages:1,previewAuditPages:0,detailLimit:0,getText:async u=>u===RSS_URL?rss(feedId).replace('テスト &amp; サンプル','English sample video'):listing(u===SOURCE?recentId:backfillId,3).replaceAll(`テスト作品 ${u===SOURCE?recentId:backfillId}`,'FC2 PPV テスト')};
     const first=await updateCatalog({items:[item(100)],newestSeenId:150},options);
-    assert.equal(first.newestSeenId,300);assert.deepEqual(first.items.map(x=>x.videoId),['100']);assert.equal(pruneCatalog(first,NOW).newestSeenId,300);
+    assert.equal(first.newestSeenId,recentId);assert.deepEqual(first.items.map(x=>x.videoId),['100']);assert.equal(pruneCatalog(first,NOW).newestSeenId,recentId);
     const second=await updateCatalog({...first,recentGap:undefined},{...options,backfillPages:0});
-    assert.equal(second.summary.previousNewestId,100);assert.equal(second.summary.crawlTargetId,300);assert.equal(second.newestSeenId,300);
+    assert.equal(second.summary.previousNewestId,100);assert.equal(second.summary.crawlTargetId,recentId);assert.equal(second.newestSeenId,recentId);
   }
 });
 test('recentGap: 不正sinceを今回日時に補正して7日後に放棄',async()=>{
@@ -725,4 +725,41 @@ test('recentGap: 不正sinceを今回日時に補正して7日後に放棄',asyn
   assert.deepEqual(first.recentGap,{targetId:100,since:new Date(NOW).toISOString()});
   const second=await updateCatalog(first,{...options,now:NOW+7*86400000});
   assert.equal('recentGap' in second,false);assert.equal(second.summary.crawlTargetId,200);assert.ok(second.warnings.some(x=>x.reason==='gap_abandoned'&&x.since===first.recentGap.since));
+});
+
+for(const excluded of [false,true])test(`newestSeenId: 放棄時RSS${excluded?'除外':'保存'}と一覧全滅後も100まで回復探索`,async()=>{
+  const options={now:NOW,recentPages:2,delayMs:0,backfillPages:0,previewAuditPages:0,detailLimit:0},since=new Date(NOW-8*86400000).toISOString();
+  const feed=rss(300).replace('テスト &amp; サンプル',excluded?'English sample video':'テスト作品 300');
+  const first=await updateCatalog({items:[item(100)],newestSeenId:100,recentGap:{targetId:100,since}},{...options,getText:async u=>{if(u===RSS_URL)return feed;throw Object.assign(Error('HTTP_503'),{status:503})}});
+  assert.ok(first.warnings.some(x=>x.reason==='gap_abandoned'));assert.equal('recentGap' in first,false);assert.equal(first.newestSeenId,100);assert.equal(first.items.some(x=>x.videoId==='300'),!excluded);
+  const pages=[];
+  const second=await updateCatalog(first,{...options,now:NOW+60000,getText:async u=>{if(u===RSS_URL)return feed;const page=u===SOURCE?1:Number(u.match(/page=(\d+)/)[1]);pages.push(page);return listing(page===4?100:301-page,page+1)}});
+  assert.equal(second.summary.crawlTargetId,100);assert.equal(second.summary.previousNewestId,excluded?100:300);assert.deepEqual(pages,[1,2,3,4]);assert.equal(second.summary.reachedPreviousNewest,true);assert.equal(second.newestSeenId,300);assert.equal('recentGap' in second,false);
+});
+test('newestSeenId: 放棄時1ページ成功後の失敗では次回基準100を保持',async()=>{
+  const options={now:NOW,recentPages:2,delayMs:0,backfillPages:0,previewAuditPages:0,detailLimit:0,getText:async u=>{if(u===RSS_URL)return rss(300);if(u===SOURCE)return listing(300,2);throw Error('HTTP_503')}};
+  const first=await updateCatalog({items:[item(100)],newestSeenId:100,recentGap:{targetId:100,since:new Date(NOW-8*86400000).toISOString()}},options);
+  assert.equal(first.newestSeenId,100);assert.equal('recentGap' in first,false);assert.ok(first.warnings.some(x=>x.reason==='gap_abandoned'));
+  const second=await updateCatalog(first,{...options,now:NOW+60000});assert.equal(second.summary.crawlTargetId,100);assert.equal(second.newestSeenId,100);
+});
+test('newestSeenId: 通常gapは失敗時保持し成功到達後に進む',async()=>{
+  const since=new Date(NOW-86400000).toISOString(),options={now:NOW,recentPages:2,delayMs:0,backfillPages:0,previewAuditPages:0,detailLimit:0};
+  const first=await updateCatalog({items:[item(100)],newestSeenId:100,recentGap:{targetId:100,since}},{...options,getText:async u=>{if(u===RSS_URL)return rss(400);if(u===SOURCE)return listing(300,2);throw Error('HTTP_503')}});
+  assert.equal(first.newestSeenId,100);assert.deepEqual(first.recentGap,{targetId:100,since});
+  const second=await updateCatalog(first,{...options,getText:async u=>u===RSS_URL?rss(400):listing(u===SOURCE?300:100,3)});
+  assert.equal(second.newestSeenId,300);assert.equal('recentGap' in second,false);
+});
+test('recentGap: 放棄時と次回の一覧全滅でもsinceを更新し7日後に再放棄',async()=>{
+  const options={now:NOW,recentPages:2,delayMs:0,backfillPages:0,previewAuditPages:0,detailLimit:0,getText:async u=>{if(u===RSS_URL)return rss(300);throw Error('HTTP_503')}};
+  const first=await updateCatalog({items:[item(100)],newestSeenId:100,recentGap:{targetId:100,since:new Date(NOW-8*86400000).toISOString()}},options);
+  assert.equal('recentGap' in first,false);assert.ok(first.warnings.some(x=>x.reason==='gap_abandoned'));
+  const next=NOW+60000,second=await updateCatalog(first,{...options,now:next});
+  assert.equal(second.newestSeenId,100);assert.deepEqual(second.recentGap,{targetId:100,since:new Date(next).toISOString()});assert.equal(second.warnings.some(x=>x.reason==='gap_abandoned'),false);
+  const third=await updateCatalog(second,{...options,now:next+7*86400000-1});assert.deepEqual(third.recentGap,second.recentGap);assert.equal(third.warnings.some(x=>x.reason==='gap_abandoned'),false);
+  const fourth=await updateCatalog(third,{...options,now:next+7*86400000});assert.equal('recentGap' in fourth,false);assert.equal(fourth.newestSeenId,100);assert.equal(fourth.warnings.filter(x=>x.reason==='gap_abandoned').length,1);
+});
+test('newestSeenId: RSSとbackfillだけの大きいIDでは進まずbackfill失敗も新着成功を妨げない',async()=>{
+  const options={now:NOW,recentPages:1,maxRecentPages:1,delayMs:0,backfillPages:1,previewAuditPages:0,detailLimit:0};
+  const first=await updateCatalog({items:[item(100)],newestSeenId:100},{...options,getText:async u=>u===RSS_URL?rss(400):listing(u===SOURCE?100:500,3)});assert.equal(first.newestSeenId,100);
+  const second=await updateCatalog(first,{...options,getText:async u=>{if(u===RSS_URL)return rss(400);if(u===SOURCE)return listing(200,2);throw Object.assign(Error('HTTP_403'),{status:403})}});assert.equal(second.newestSeenId,200);
 });
