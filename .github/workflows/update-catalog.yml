@@ -6,7 +6,7 @@
 # L2: commit 後の pull --rebase → push を最大3回、5秒待って再試行。
 # L6: checkout の資格情報保存を無効化し、pull/push 専用ステップだけ token を env で渡す。
 # L7: fetch-depth: 0 を維持。浅い clone は判断事項（rebase の検証が先）。
-# L6（判断事項）: Actions の SHA 固定は未実施。既存の @v4 等を維持。
+# L6（TM-02）: Actions は SHA で固定（行末コメントが版）。更新は .github/dependabot.yml の PR で受け取る。
 name: Update TokyoMotion catalog
 
 on:
@@ -35,14 +35,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
           persist-credentials: false
           # L7: 浅い clone は判断事項（rebase の検証が先）。
           fetch-depth: 0
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
       - name: Test parsers, accumulation, backfill and UI
