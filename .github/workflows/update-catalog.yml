@@ -7,6 +7,8 @@
 # L6: checkout の資格情報保存を無効化し、pull/push 専用ステップだけ token を env で渡す。
 # L7: fetch-depth: 0 を維持。浅い clone は判断事項（rebase の検証が先）。
 # L6（TM-02）: Actions は SHA で固定（行末コメントが版）。更新は .github/dependabot.yml の PR で受け取る。
+# F4（tm-catalog-improvement）: data/catalog-head.json も commit する（先読みファイル）。未適用でもフロントは videos.json 単独に戻るだけで壊れない。
+# tm-catalog-improvement: scripts/update.mjs が assets/catalog-core.mjs を import するため、on.push.paths に追加。
 name: Update TokyoMotion catalog
 
 on:
@@ -17,6 +19,7 @@ on:
       - 'tests/**'
       - 'assets/language.mjs'
       - 'assets/content-filter.mjs'
+      - 'assets/catalog-core.mjs'
       - '.github/workflows/update-catalog.yml'
   schedule:
     - cron: "7,37 * * * *"
@@ -63,7 +66,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/videos.json
+          git add data/videos.json data/catalog-head.json
           git diff --cached --quiet && exit 0
           git commit -m "chore: update TokyoMotion catalog"
           echo "committed=true" >> "$GITHUB_OUTPUT"
