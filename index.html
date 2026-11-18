@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#101010">
   <title>MOTION | 日本語カタログ</title>
-  <link rel="stylesheet" href="assets/site.css?v=20261008-content1">
+  <link rel="stylesheet" href="assets/site.css?v=20261118-r2">
 </head>
 <body>
   <a class="skip-link" href="#main">作品一覧へ</a>
@@ -22,6 +22,7 @@
     <nav>
       <button data-view="home" class="nav-item active"><span aria-hidden="true">⌂</span>ホーム</button>
       <button data-view="recent" class="nav-item"><span aria-hidden="true">◷</span>新着</button>
+      <button data-view="since" class="nav-item" hidden>前回からの新着<span class="since-count" data-since-count></span></button>
       <button data-view="popular" class="nav-item"><span aria-hidden="true">↗</span>人気の作品</button>
       <button data-view="rated" class="nav-item"><span aria-hidden="true">☆</span>高評価</button>
       <button data-view="archive" class="nav-item"><span aria-hidden="true">▤</span>過去の作品</button>
@@ -33,7 +34,8 @@
   </aside>
   <main id="main">
     <div id="browse-view">
-    <nav class="chips" aria-label="表示切り替え"><button data-view="home" class="chip active">すべて</button><button data-view="recent" class="chip">新着</button><button data-view="popular" class="chip">人気</button><button data-view="rated" class="chip">高評価</button><button data-view="archive" class="chip">過去の作品</button><button data-view="favorites" class="chip">お気に入り</button><button data-view="history" class="chip">再生履歴</button></nav>
+    <nav class="chips" aria-label="表示切り替え"><button data-view="home" class="chip active">すべて</button><button data-view="recent" class="chip">新着</button><button data-view="since" class="chip" hidden>前回からの新着<span class="since-count" data-since-count></span></button><button data-view="popular" class="chip">人気</button><button data-view="rated" class="chip">高評価</button><button data-view="archive" class="chip">過去の作品</button><button data-view="favorites" class="chip">お気に入り</button><button data-view="history" class="chip">再生履歴</button></nav>
+    <p id="catalog-info" class="catalog-info" aria-live="polite">読み込み中…</p>
         <div id="notice" class="notice" role="status" hidden></div>
     <section id="shelf-section" class="shelf-section" aria-labelledby="shelf-title"><div class="section-head"><h2 id="shelf-title">いま人気の作品</h2><button id="all-popular" class="text-button">すべて見る <span aria-hidden="true">›</span></button></div><div class="shelf" id="shelf"></div></section>
     <section class="catalog-section" aria-labelledby="section-title"><div class="section-head catalog-head"><div><h2 id="section-title">新着の作品</h2><p id="count" class="count" aria-live="polite">読み込み中…</p></div><div class="filters"><label><span class="sr-only">カテゴリ</span><select id="category"><option value="">すべてのカテゴリ</option></select></label><label><span class="sr-only">並び順</span><select id="sort"><option value="new">新しい順</option><option value="old">古い順</option><option value="views">再生数順</option><option value="rating">高評価順</option><option value="title">タイトル順</option></select></label></div></div><div id="grid" class="grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><div class="more-wrap"><button id="more" class="more-button" hidden>さらに36件を表示 <span aria-hidden="true">⌄</span></button></div></section>
@@ -48,6 +50,6 @@
   </main>
   <dialog id="details" class="details-dialog" aria-labelledby="detail-title"><button id="detail-close" class="detail-close" aria-label="詳細を閉じる">×</button><div id="detail-content"></div></dialog>
   <noscript><p class="notice">作品一覧の表示にはJavaScriptを有効にしてください。</p></noscript>
-  <script type="module" src="assets/app.mjs?v=20261008-content1"></script>
+  <script type="module" src="assets/app.mjs?v=20261118-r2"></script>
 </body>
 </html>

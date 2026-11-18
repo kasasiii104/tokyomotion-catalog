@@ -1,8 +1,9 @@
 import { mkdir, readFile, writeFile, rename, appendFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { classifyTitle, filterJapanese, LANGUAGE_POLICY_VERSION } from "../assets/language.mjs";
 import { auditContent, contentId, contentExclusionReasons, CONTENT_POLICY_VERSION } from "../assets/content-filter.mjs";
+import { firstSeenMs, isListed, selectItems } from "../assets/catalog-core.mjs";
 
 export const SOURCE = "https://www.tokyomotion.net";
 export const RSS_URL = `${SOURCE}/rss`;
@@ -11,6 +12,8 @@ export const RATING_VERSION = 1;
 export const PREVIEW_VERSION = 1;
 const OUTPUT = new URL("../data/videos.json", import.meta.url);
 const HOUR = 3600000;
+const NOT_FOUND_DAYS = 30;
+const EXPIRED_RETENTION_DAYS = 180;
 
 export function decode(value = "") {
   return String(value).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gi, "$1")
@@ -188,6 +191,35 @@ export function migrateItems(data) {
   });
 }
 
+function parseLifecycleDate(value) {
+  return typeof value==="string"?Date.parse(value):NaN;
+}
+
+export function migrateLifecycle(item) {
+  if(!Number.isFinite(parseLifecycleDate(item.detailCheckedAt)))return item;
+  if(item.availability==="not_found"&&!Object.hasOwn(item,"notFoundSince"))return {...item,notFoundSince:item.detailCheckedAt};
+  if(["embed_available","unavailable"].includes(item.availability)&&!Object.hasOwn(item,"detailOkAt"))return {...item,detailOkAt:item.detailCheckedAt};
+  return item;
+}
+
+export function migrateFirstSeen(item,now) {
+  if(Object.hasOwn(item,"firstSeenAt")||!Number.isFinite(item.date)||item.date<=0)return item;
+  return {...item,firstSeenAt:new Date(Math.min(item.date,now)).toISOString()};
+}
+
+export function expireNotFound(items,now,{days=NOT_FOUND_DAYS}={}) {
+  const kept=[],removed=[],duration=days*24*HOUR;
+  for(const item of items) {
+    const since=parseLifecycleDate(item.notFoundSince);
+    if(item.availability==="not_found"&&Number.isFinite(since)&&now-since>duration
+      &&parseLifecycleDate(item.detailCheckedAt)-since>=duration
+      &&(!Object.hasOwn(item,"detailOkAt")||parseLifecycleDate(item.detailOkAt)<since)) {
+      removed.push(item);
+    }else kept.push(item);
+  }
+  return {kept,removed};
+}
+
 export function mergeItems(...lists) {
   const map=new Map(),dateRank={unknown:0,relative:1,rss:2,official:3},titleRank={rss:0,listing:1,detail:2};
   for(const item of lists.flat()) {
@@ -195,6 +227,7 @@ export function mergeItems(...lists) {
     if(!key)continue;
     const old=map.get(key),result={...old,...item,id:old?.id||item.id||`video:${key}`,videoId:key,sourceUrl:url,
       categories:[...new Set([...(old?.categories||[]),...(item.categories||[])])]};
+    if(["embed_available","unavailable"].includes(item.availability)&&Object.hasOwn(item,"detailOkAt")&&!Object.hasOwn(item,"notFoundSince"))delete result.notFoundSince;
     for(const field of ["title","image","embedUrl"])if(!item[field] && old?.[field] && !["unavailable","not_found"].includes(item.availability))result[field]=old[field];
     result.titleSource=item.titleSource||"listing";
     if(old?.title && !["unavailable","not_found"].includes(item.availability) && (!item.title || titleRank[result.titleSource]<titleRank[old.titleSource||"listing"])) {
@@ -212,13 +245,50 @@ export function mergeItems(...lists) {
 }
 
 export function detailQueue(items,now,limit=240) {
-  const due=items.filter(x=>!(x.detailFailures>0&&now-Date.parse(x.detailAttemptAt)<Math.min(2**(x.detailFailures-1),168)*HOUR)).filter(x=>!x.detailCheckedAt||now-Date.parse(x.detailCheckedAt)>24*HOUR||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION||(now-x.date<48*HOUR&&now-Date.parse(x.detailCheckedAt)>6*HOUR));
-  const pending=due.filter(x=>!x.detailCheckedAt).sort((a,b)=>(a.detailFailures||0)-(b.detailFailures||0)||Number(b.videoId)-Number(a.videoId));
-  const refresh=due.filter(x=>x.detailCheckedAt).sort((a,b)=>(a.detailFailures||0)-(b.detailFailures||0)||Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt));
-  const selected=[...pending.slice(0,Math.max(1,Math.floor(limit*.65))),...refresh.slice(0,Math.max(1,Math.floor(limit*.35)))];
-  const keys=new Set(selected.map(x=>x.videoId));
-  for(const item of [...pending,...refresh])if(selected.length<limit&&!keys.has(item.videoId)){selected.push(item);keys.add(item.videoId);}
-  return selected.slice(0,limit);
+  return detailQueuePlan(items,now,limit).queue;
+}
+
+export function detailQueuePlan(items,now,limit=240,{
+  popularPool=100,popularHot=12,popularMinAgeHours=3,freshDays=7,freshMinAgeHours=6,
+  pendingShare=0.5,popularShare=0.15,freshShare=0.10,
+}={}) {
+  const eligible=items.filter(x=>!(x.detailFailures>0&&now-Date.parse(x.detailAttemptAt)<Math.min(2**(x.detailFailures-1),168)*HOUR));
+  const oldestFirst=(a,b)=>Date.parse(a.detailCheckedAt)-Date.parse(b.detailCheckedAt);
+  const fewerFailuresFirst=(a,b)=>(a.detailFailures||0)-(b.detailFailures||0);
+  const checkedBefore=(x,hours)=>now-Date.parse(x.detailCheckedAt)>hours*HOUR;
+  // An unparsable check time is treated as never checked so the work cannot drop out of every lane.
+  const needsDetails=x=>!Number.isFinite(Date.parse(x.detailCheckedAt))||x.statsVersion!==SCHEMA_VERSION||x.ratingVersion!==RATING_VERSION||x.previewVersion!==PREVIEW_VERSION;
+  const ranked=items.filter(x=>isListed(x)&&Number.isFinite(x.views)).sort((a,b)=>b.views-a.views).slice(0,popularPool);
+  const eligibleItems=new Set(eligible);
+  // Keep the published ranking fixed when an entry is recent or in backoff.
+  const popular=[ranked.slice(0,popularHot),ranked.slice(popularHot)].flatMap(group=>
+    group.filter(x=>eligibleItems.has(x)&&checkedBefore(x,popularMinAgeHours)).sort(oldestFirst));
+  const lanes={
+    pending:eligible.filter(needsDetails).sort((a,b)=>fewerFailuresFirst(a,b)||Number(b.videoId)-Number(a.videoId)),
+    popular,
+    fresh:eligible.filter(x=>isListed(x)&&Number.isFinite(x.date)&&now-x.date>=0&&now-x.date<=freshDays*24*HOUR&&checkedBefore(x,freshMinAgeHours)).sort(oldestFirst),
+    rotation:eligible.filter(x=>x.detailCheckedAt&&(needsDetails(x)||checkedBefore(x,24)||(now-x.date<48*HOUR&&checkedBefore(x,6))))
+      .sort((a,b)=>fewerFailuresFirst(a,b)||oldestFirst(a,b)),
+  };
+  const slots=share=>Math.max(1,Math.floor(limit*share));
+  const quotas={pending:slots(pendingShare),popular:slots(popularShare),fresh:slots(freshShare)};
+  quotas.rotation=Math.max(0,limit-quotas.pending-quotas.popular-quotas.fresh);
+
+  const queue=[],selected=new Set();
+  const detailLanes={pending:0,popular:0,fresh:0,rotation:0};
+  function take(lane,count) {
+    for(const x of lanes[lane]){
+      if(count<=0||queue.length>=limit)break;
+      if(selected.has(x.videoId))continue;
+      selected.add(x.videoId);
+      queue.push(x);
+      detailLanes[lane]++;
+      count--;
+    }
+  }
+  for(const lane of Object.keys(quotas))take(lane,quotas[lane]);
+  for(const lane of ["pending","rotation","popular","fresh"])take(lane,limit-queue.length);
+  return {queue,detailLanes};
 }
 
 export async function fetchText(url) {
@@ -248,6 +318,43 @@ function itemCounts(items) {
     withEmbeds:items.filter(x=>x.embedUrl).length,withViews:items.filter(x=>x.views!=null).length,withVotes:items.filter(x=>x.likes!=null&&x.dislikes!=null).length};
 }
 
+const HEAD_FIELDS = [
+  "id", "videoId", "sourceUrl", "title", "image", "embedUrl", "availability",
+  "categories", "date", "dateLabel", "dateSource", "views", "likes", "dislikes",
+  "ratingPercent", "statsVersion", "listingCheckedAt", "preview", "description",
+  "contentExclusions", "firstSeenAt", "tags"
+];
+
+export function buildHead(catalog,{newCount=216,popularCount=120,ratedCount=120,sinceDays=3,sinceMax=600}={}) {
+  const items=catalog.items||[];
+  const listed=items.filter(isListed);
+  const newest=selectItems(listed,{sort:"new"});
+  const updated=Date.parse(catalog.updatedAt);
+  const cutoff=updated-sinceDays*24*HOUR;
+  const recent=newest.filter(item=>{
+    const seen=firstSeenMs(item);
+    return seen>=cutoff&&seen<=updated;
+  }).sort((a,b)=>firstSeenMs(b)-firstSeenMs(a)).slice(0,sinceMax);
+  const selected=new Set([
+    ...newest.slice(0,newCount),
+    ...selectItems(listed,{sort:"views"}).slice(0,popularCount),
+    ...selectItems(listed,{sort:"rating"}).slice(0,ratedCount),
+    ...recent
+  ].map(item=>item.id));
+  return {
+    headVersion:1,
+    updatedAt:catalog.updatedAt,
+    source:catalog.source,
+    backfill:catalog.backfill,
+    errorCount:(catalog.errors||[]).length,
+    counts:{total:items.length,listed:listed.length},
+    categories:[...new Set(listed.flatMap(item=>item.categories||[]))].sort((a,b)=>a.localeCompare(b,"ja")),
+    full:"data/videos.json",
+    items:newest.filter(item=>selected.delete(item.id)).map(item=>
+      Object.fromEntries(HEAD_FIELDS.filter(key=>Object.hasOwn(item,key)).map(key=>[key,item[key]])))
+  };
+}
+
 // Offline cleanup preserves metadata, crawl cursors and the last collection time.
 // Only IDs and reasons are kept as tombstones, not removed titles or media URLs.
 export function pruneCatalog(previous={},now=Date.now()) {
@@ -260,8 +367,10 @@ export function pruneCatalog(previous={},now=Date.now()) {
     summary:{...previous.summary,...itemCounts(items),newItems:0},items};
 }
 
-export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,maxRecentPages=30,recentGapMaxDays=7,staleAfterMinutes=90,backfillPages=12,backfillRecheckDays=7,previewAuditPages=24,detailLimit=240,delayMs=300,timeBudgetMs=15*60*1000,clock=Date.now}={}) {
+// F2: 320 keeps the full rotation near the previous ~28 days while popular/fresh lanes take 25% (simulated on 2026-11-18 data).
+export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now(),recentPages=6,maxRecentPages=30,recentGapMaxDays=7,staleAfterMinutes=90,backfillPages=12,backfillRecheckDays=7,previewAuditPages=24,detailLimit=320,delayMs=300,timeBudgetMs=15*60*1000,clock=Date.now}={}) {
   const startedAt=clock();
+  const previousItems=migrateItems({items:(previous.items||[]).map(item=>migrateFirstSeen(migrateLifecycle(item),now))});
   let accessBlocked=false,budgetExceeded=false;
   const errors=[],warnings=[];
   const previousNewestId=(previous.items||[]).reduce((newest,item)=>{const id=Number(item.videoId);return Number.isFinite(id)&&id>0?Math.max(newest||0,id):newest},null);
@@ -318,11 +427,24 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     }catch(error){if(budgetExceeded)break;errors.push({stage:"backfill",page,reason:error.message});break;}
   }
   if(!feed.length&&!successfulListings)throw new Error(`No source metadata retrieved; previous catalog preserved (${errors.map(e=>e.reason).join(", ")})`);
-  const previousAudit=filterJapanese(migrateItems(previous));
-  let contentAudit=auditContent([...migrateItems(previous),...listings,...feed],previous.contentPolicy?.excludedItems);
+  const previousAudit=filterJapanese(previousItems);
+  const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
+  const expired=new Map();
+  for(const entry of previous.notFoundPolicy?.expired||[]){
+    const videoId=String(entry?.videoId??""),at=entry?.at,time=parseLifecycleDate(at);
+    if(!/^\d+$/.test(videoId)||!Number.isFinite(time)||now-time>EXPIRED_RETENTION_DAYS*24*HOUR)continue;
+    if(!expired.has(videoId)||time>parseLifecycleDate(expired.get(videoId).at))expired.set(videoId,{videoId,at});
+  }
+  const firstSeenAt=new Date(now).toISOString();
+  let contentAudit=auditContent([...previousItems,...listings,...feed],previous.contentPolicy?.excludedItems);
   const candidates=mergeItems(contentAudit.accepted);
   const discoveryAudit=filterJapanese(candidates);
-  let items=discoveryAudit.accepted;
+  let revivedFromExpired=0;
+  let items=discoveryAudit.accepted.map(item=>{
+    if(previousIds.has(item.videoId)||!expired.delete(item.videoId))return item;
+    revivedFromExpired++;
+    return {...item,availability:"not_found",notFoundSince:firstSeenAt};
+  });
   // One bounded rescan of already-visited lists repairs old items without guessing image URLs.
   // Keep the archive discovery cursor intact and never add a work solely from this audit.
   const auditEnd=Math.max(recentPages,Number(previous.backfill?.nextPage||recentPages+1)-1);
@@ -340,7 +462,7 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
       previewAudit.nextPage=page+1;previewAuditProcessed++;previewAudit.complete=!result.hasNext||previewAudit.nextPage>previewAudit.endPage;
     }catch(error){if(budgetExceeded)break;errors.push({stage:'preview_audit',page,reason:error.message});break}
   }
-  const queue=detailQueue(items,now,detailLimit),details=[];
+  const {queue,detailLanes}=detailQueuePlan(items,now,detailLimit),details=[];
   let detailAttempted=0;
   for(const item of queue) {
     if(accessBlocked||budgetExceeded)break;
@@ -348,11 +470,17 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
     try {
       const detail=parseDetail(await request(item.sourceUrl),now,item.videoId);
       const keepDate=item.dateSource==="rss"&&detail.dateSource!=="official";
-      details.push({...item,...detail,detailFailures:0,detailAttemptAt:null,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel});
+      const updated={...item,...detail,detailOkAt:detail.detailCheckedAt,detailFailures:0,detailAttemptAt:null,views:detail.views??item.views??null,date:keepDate?item.date:detail.date,dateSource:keepDate?"rss":detail.dateSource,dateLabel:keepDate?item.dateLabel:detail.dateLabel};
+      delete updated.notFoundSince;
+      details.push(updated);
     }catch(error){
       if(budgetExceeded){detailAttempted--;break;}
       errors.push({stage:"detail",videoId:item.videoId,reason:error.message});
-      if(error.status===404)details.push({...item,detailFailures:0,detailAttemptAt:null,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt:new Date(now).toISOString(),lastError:"HTTP_404"});
+      if(error.status===404){
+        const detailCheckedAt=new Date(now).toISOString();
+        const notFoundSince=item.availability==="not_found"&&Number.isFinite(parseLifecycleDate(item.notFoundSince))?item.notFoundSince:detailCheckedAt;
+        details.push({...item,notFoundSince,detailFailures:0,detailAttemptAt:null,availability:"not_found",embedUrl:"",preview:null,likes:null,dislikes:null,ratingPercent:null,statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt,lastError:"HTTP_404"});
+      }
       else if(!accessBlocked)details.push({...item,detailFailures:(item.detailFailures||0)+1,detailAttemptAt:new Date(now).toISOString(),lastError:error.message});
     }
   }
@@ -360,16 +488,21 @@ export async function updateCatalog(previous={}, {getText=fetchText,now=Date.now
   const finalAudit=filterJapanese(mergeItems(contentAudit.accepted));
   items=finalAudit.accepted.map(item=>({...item,categories:item.categories||[]}));
   items.sort((a,b)=>(b.date||0)-(a.date||0)||Number(b.videoId)-Number(a.videoId));
-  const previousIds=new Set((previous.items||[]).map(x=>videoKey(x.sourceUrl)));
   const rejected=[...discoveryAudit.rejected,...finalAudit.rejected],reasons={};
   const finalIds=new Set(items.map(x=>x.videoId));
   const removedExisting=new Set([...previousAudit.rejected,...rejected].map(x=>x.videoId).filter(id=>previousIds.has(id)&&!finalIds.has(id))).size;
   for(const x of rejected)reasons[x.reason]=(reasons[x.reason]||0)+1;
+  const {kept,removed}=expireNotFound(items,now);
+  for(const {videoId} of removed)expired.set(videoId,{videoId,at:firstSeenAt});
+  items=kept.map(item=>previousIds.has(item.videoId)||Object.hasOwn(item,"firstSeenAt")?item:{...item,firstSeenAt});
+  const expiredNotFound=removed.length;
   return {schemaVersion:SCHEMA_VERSION,updatedAt:new Date(now).toISOString(),source:RSS_URL,backfill,previewAudit,...(newestSeenId!==null?{newestSeenId}:{}),...(recentGap?{recentGap}:{}),
     contentPolicy:contentPolicy(previous,contentAudit,now),
+    notFoundPolicy:{days:NOT_FOUND_DAYS,removedThisRun:expiredNotFound,removedTotal:(previous.notFoundPolicy?.removedTotal||0)+expiredNotFound,
+      expired:[...expired.values()],lastRemoval:expiredNotFound?{at:new Date(now).toISOString(),count:expiredNotFound}:previous.notFoundPolicy?.lastRemoval||null},
     languagePolicy:{version:LANGUAGE_POLICY_VERSION,mode:"japanese_titles_only",auditedAt:new Date(now).toISOString(),excludedThisRun:rejected.length,removedExisting,removedExistingTotal:(previous.languagePolicy?.removedExistingTotal||0)+removedExisting,reasons},
     collection:{recentPages,maxRecentPages,backfillPages,previewAuditPages,detailLimit,timeBudgetMs},
-    summary:{...itemCounts(items),elapsedMs:clock()-startedAt,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
+    summary:{...itemCounts(items),detailLanes,expiredNotFound,revivedFromExpired,elapsedMs:clock()-startedAt,newItems:items.filter(x=>!previousIds.has(x.videoId)).length,
       rssItems:feed.length,listingItems:new Set(listings.map(x=>x.videoId)).size,backfillFrom:startPage,backfillPages:processedPages,
       detailRefreshed:details.filter(x=>!x.detailFailures).length,detailFailed:details.filter(x=>x.detailFailures>0).length,recentPagesFetched,previousNewestId,crawlTargetId,reachedPreviousNewest,minutesSinceLastRun,recentPagesOk,detailAttempted,previewAuditPages:previewAuditProcessed},errors,warnings,items};
 }
@@ -405,8 +538,23 @@ export async function runMain({argv=process.argv,output=OUTPUT,update=updateCata
     const validation=validateForSave(result,previous,{allowShrink:argv.includes('--allow-shrink'),expectedSchema:argv.includes('--prune-only')?previous.schemaVersion:SCHEMA_VERSION});
     if(!validation.ok){log(`::error title=Catalog save refused::${validation.reason}`);return 1;}
     const target=output instanceof URL?fileURLToPath(output):output,temp=`${target}.tmp`;
+    let headJson;
+    try {
+      headJson=JSON.stringify(buildHead(result));
+    }catch(error){
+      log(`::warning title=Catalog head not built::${error.message}`);
+      headJson=JSON.stringify({headVersion:0,updatedAt:result.updatedAt});
+    }
     await mkdir(dirname(target),{recursive:true});
     await writeFile(temp,`${JSON.stringify(result,null,2)}\n`);await rename(temp,target);
+    try {
+      const headTarget=join(dirname(target),"catalog-head.json"),headTemp=`${headTarget}.tmp`;
+      await writeFile(headTemp,`${headJson}\n`);
+      await rename(headTemp,headTarget);
+    }catch(error){
+      log(`::error title=Catalog head not written::${error.message}`);
+      return 1;
+    }
     const {excludedItems,...policy}=result.contentPolicy||{};
     log(JSON.stringify({updatedAt:result.updatedAt,summary:result.summary,backfill:result.backfill,contentPolicy:policy,errors:result.errors}));
     const assessment=assessRun(result),summary=[Object.entries(assessment.counts).map(([stage,count])=>`${stage}=${count}`).join(", "),...assessment.messages].filter(Boolean).join("; ");

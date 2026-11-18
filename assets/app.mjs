@@ -1,11 +1,19 @@
-import {PAGE_SIZE,escapeHTML as esc,safeUrl,stats,prepareItems,selectItems} from './catalog-core.mjs?v=20261008-content1';
+import {PAGE_SIZE,escapeHTML as esc,safeUrl,stats,prepareItems,isListed,selectItems,catalogInfo,visitBaseline,isNewSince} from './catalog-core.mjs?v=20261118-r2';
 import {PreviewController,previewSpec} from './preview-controller.mjs?v=20261005-preview2';
 
 const $=id=>document.getElementById(id);
 function stored(key){try{const value=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(value)?value.filter(x=>typeof x==='string'):[]}catch{return []}}
-const state={items:[],byId:new Map(),favorites:new Set(stored('tm-favorites')),history:stored('tm-history'),view:'home',limit:PAGE_SIZE,shown:0,data:null,loading:false,watch:null,watchTimer:null,returnScroll:0,returnFocus:null,detailId:null};
+const state={items:[],byId:new Map(),favorites:new Set(stored('tm-favorites')),history:stored('tm-history'),view:'home',limit:PAGE_SIZE,shown:0,data:null,partial:false,fullFailed:false,loading:false,watch:null,watchTimer:null,returnScroll:0,returnFocus:null,detailId:null,visit:null};
 const previews=new PreviewController();
 function save(){try{localStorage.setItem('tm-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('tm-history',JSON.stringify(state.history.slice(0,100)))}catch{}}
+function initVisit(){
+  if(state.visit)return;
+  let last,session;
+  try{last=localStorage.getItem('tm-last-visit')}catch{}
+  try{session=sessionStorage.getItem('tm-visit-baseline')}catch{}
+  state.visit=visitBaseline({last,session},Date.now());
+  try{sessionStorage.setItem('tm-visit-baseline',state.visit.session)}catch{}
+}
 function playable(x){return !!safeUrl(x.embedUrl,'embed')&&!['not_found','unavailable'].includes(x.availability)}
 function dateText(x){return (x.dateLabel||'日付不明')+(x.dateSource==='relative'?'頃':'')}
 function statsMarkup(x){const s=stats(x);return `<div class="card-stats"><span class="views-stat">${esc(s.views)}</span><span class="rating-stat">${esc(s.rating)}</span></div>${s.votes?`<div class="vote-count">${esc(s.votes)}</div>`:''}`}
@@ -13,7 +21,7 @@ function thumbnail(x){
   const image=safeUrl(x.image,'image'),available=!!previewSpec(x);
   return `<button type="button" class="thumb-button" data-preview aria-label="${available?'画像プレビューを開始・停止':'プレビュー素材なし'}" aria-pressed="false" ${available?'':'aria-disabled="true"'}><span class="sr-only">${esc(x.title)}</span>${image?`<img src="${esc(image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`:'<span class="thumb-fallback">サムネイル未取得</span>'}<span class="preview-indicator" aria-hidden="true">${available?'画像プレビュー':'プレビューなし'}</span></button><button type="button" class="fav" data-fav aria-label="お気に入り" aria-pressed="${state.favorites.has(x.id)}">${state.favorites.has(x.id)?'♥':'♡'}</button>`;
 }
-function card(x,section){return `<article class="card" data-id="${esc(x.id)}" data-card="${esc(section+':'+x.id)}"><div class="media">${thumbnail(x)}</div><div class="card-body"><h3 class="card-title"><button type="button" data-detail>${esc(x.title)}</button></h3>${statsMarkup(x)}<div class="card-date">${esc(dateText(x))}</div><div class="card-actions"><button type="button" data-watch ${playable(x)?'':'disabled'}>▶ 本編を再生</button><button type="button" data-detail>詳細</button></div></div></article>`}
+function card(x,section){return `<article class="card" data-id="${esc(x.id)}" data-card="${esc(section+':'+x.id)}"><div class="media">${thumbnail(x)}</div><div class="card-body"><h3 class="card-title"><button type="button" data-detail>${esc(x.title)}</button></h3>${statsMarkup(x)}<div class="card-date">${isNewSince(x,state.visit?.baseline)?'<span class="new-badge">NEW</span>':''}${esc(dateText(x))}</div><div class="card-actions"><button type="button" data-watch ${playable(x)?'':'disabled'}>▶ 本編を再生</button><button type="button" data-detail>詳細</button></div></div></article>`}
 function bindImages(root){root.querySelectorAll('img:not([data-bound])').forEach(img=>{img.dataset.bound='1';const fail=()=>{if(!img.isConnected)return;img.classList.add('image-failed');img.alt='画像を読み込めません'};img.addEventListener('error',fail);img.addEventListener('load',()=>img.classList.remove('image-failed'));if(img.complete&&!img.naturalWidth)fail()})}
 function togglePreview(cardEl){
   const item=state.byId.get(cardEl.dataset.id),spec=item&&previewSpec(item);
@@ -55,21 +63,33 @@ function openWatch(item,trigger){
   $('watch-info').innerHTML=`<div data-item="${esc(item.id)}" data-id="${esc(item.id)}">${statsMarkup(item)}<p class="detail-date">${esc(dateText(item))}</p><div class="watch-actions">${favoriteButton(item)}${sourceLink(item)}</div><p class="description">${esc(description(item))}</p></div>`;
   mountPlayer(item);state.history=[item.id,...state.history.filter(x=>x!==item.id)].slice(0,100);save();window.scrollTo({top:0,behavior:'instant'});$('watch-back').focus({preventScroll:true});
 }
-function currentList(){return selectItems(state.items,{query:$('q').value,category:$('category').value,view:state.view,sort:$('sort').value,favorites:state.favorites,history:state.history})}
+function currentList(){return selectItems(state.items,{query:$('q').value,category:$('category').value,view:state.view,sort:$('sort').value,favorites:state.favorites,history:state.history,since:state.visit?.baseline})}
+const fullFailureMessage='全件の読み込みに失敗しました。右上の更新ボタンで再読み込みできます。';
 function render({append=false}={}){
-  const list=currentList(),visible=list.slice(0,state.limit);
+  const waiting=state.partial&&(
+    !['home','recent','popular','rated','since'].includes(state.view)||
+    $('q').value.trim()||$('category').value||['old','title'].includes($('sort').value)
+  );
+  const list=waiting?[]:currentList(),visible=list.slice(0,state.limit);
   if(append){$('grid').insertAdjacentHTML('beforeend',visible.slice(state.shown).map(x=>card(x,'grid')).join(''))}
   else{
     previews.stop();
-    $('grid').innerHTML=visible.length?visible.map(x=>card(x,'grid')).join(''):`<div class="empty">${state.view==='favorites'?'お気に入りはまだありません。カードの♡で追加できます。':state.view==='history'?'再生履歴はまだありません。':'条件に一致する作品がありません。'}</div>`;
-    const showShelf=state.view==='home'&&!$('q').value.trim()&&!$('category').value&&$('sort').value==='new'&&state.items.length>0;
+    $('grid').innerHTML=visible.length?visible.map(x=>card(x,'grid')).join(''):`<div class="empty">${waiting?(state.fullFailed?fullFailureMessage:'全件を読み込み中です…'):state.view==='favorites'?'お気に入りはまだありません。カードの♡で追加できます。':state.view==='history'?'再生履歴はまだありません。':state.view==='since'?'前回の訪問以降に増えた作品はありません。':'条件に一致する作品がありません。'}</div>`;
+    const showShelf=!waiting&&state.view==='home'&&!$('q').value.trim()&&!$('category').value&&$('sort').value==='new'&&state.items.length>0;
     $('shelf-section').hidden=!showShelf;$('shelf').innerHTML=showShelf?selectItems(state.items,{view:'popular'}).slice(0,10).map(x=>card(x,'shelf')).join(''):'';
-    const names={home:'新着の作品',recent:'新着の作品',popular:'人気の作品',rated:'高評価の作品',archive:'過去の作品',favorites:'お気に入り',history:'再生履歴'};
+    const names={home:'新着の作品',recent:'新着の作品',since:'前回からの新着',popular:'人気の作品',rated:'高評価の作品',archive:'過去の作品',favorites:'お気に入り',history:'再生履歴'};
     const sorts={new:'新着の作品',old:'過去の作品',views:'再生数の多い作品',rating:'高評価の作品',title:'作品一覧'};
     $('section-title').textContent=$('q').value.trim()?'検索結果':state.view==='home'?sorts[$('sort').value]:names[state.view];
     document.querySelectorAll('[data-view]').forEach(el=>{const active=el.dataset.view===state.view;el.classList.toggle('active',active);el.setAttribute('aria-pressed',String(active))});
   }
-  state.shown=visible.length;$('count').textContent=`${list.length.toLocaleString('ja-JP')}件 · ${visible.length}件を表示`;$('more').hidden=visible.length>=list.length;bindImages($('main'));
+  state.shown=visible.length;
+  $('more').hidden=visible.length>=list.length;
+  if(waiting)$('count').textContent=state.fullFailed?fullFailureMessage:'全件を読み込み中…';
+  else if(state.partial){
+    const status=state.fullFailed?'全件の読み込みに失敗しました':'全件を読み込み中…';
+    $('count').textContent=`先読み ${visible.length}件を表示中 · ${status}`;
+  }else $('count').textContent=`${list.length.toLocaleString('ja-JP')}件 · ${visible.length}件を表示`;
+  bindImages($('main'));
   if(state.data){const d=state.data,date=d.updatedAt?new Date(d.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}):'未更新';$('catalog-status').textContent=`最終取得 ${date}（日本時間） · 日本語タイトルのみ`+(d.backfill?` · 過去作品 ${d.backfill.complete?'巡回完了':'次回'+d.backfill.nextPage+'ページ目から'}`:'')}
 }
 function setView(view){showBrowse({restore:false});state.view=view;state.limit=PAGE_SIZE;$('q').value='';$('category').value='';$('sort').value=({archive:'old',popular:'views',rated:'rating'})[view]||'new';setMenu(false);render()}
@@ -79,22 +99,112 @@ function toggleFavorite(item){
   if(state.view==='favorites'&&!state.watch)render();
   document.querySelectorAll('[data-id]').forEach(el=>{if(el.dataset.id!==item.id)return;const button=el.querySelector('[data-fav]');if(!button)return;const favorite=state.favorites.has(item.id);button.setAttribute('aria-pressed',String(favorite));button.textContent=button.classList.contains('fav')?(favorite?'♥':'♡'):(favorite?'♥ お気に入り済み':'♡ お気に入り')});
 }
-async function load(){
-  if(state.loading)return;state.loading=true;$('refresh').disabled=true;$('notice').hidden=true;
+async function fetchCatalog(url){
   let timer;
   try{
-    let signal;if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')signal=AbortSignal.timeout(30000);else if(typeof AbortController!=='undefined'){const controller=new AbortController();signal=controller.signal;timer=setTimeout(()=>controller.abort(),30000)}
-    const response=await fetch('data/videos.json',{cache:'no-cache',...(signal?{signal}:{})});if(!response.ok)throw new Error('一覧を取得できませんでした（HTTP '+response.status+'）');
-    const data=await response.json();if(!Array.isArray(data.items))throw new Error('カタログの形式が不正です。');
-    const items=prepareItems(data.items,data.contentPolicy?.excludedItems),byId=new Map(items.map(x=>[x.id,x]));
-    const previous=$('category').value,categories=[...new Set(items.flatMap(x=>x.categories))].sort((a,b)=>a.localeCompare(b,'ja'));
-    previews.stop();state.data=data;state.items=items;state.byId=byId;
-    $('category').innerHTML='<option value="">すべてのカテゴリ</option>'+categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(categories.includes(previous))$('category').value=previous;render();
-    if(state.detailId){const x=state.byId.get(state.detailId);if(x)$('detail-content').innerHTML=detailMarkup(x);else closeDetails()}
-    if(state.watch&&!playable(state.byId.get(state.watch)||{}))showBrowse();
-    if(data.errors?.length||data.updatedAt&&Date.now()-Date.parse(data.updatedAt)>3*3600000){$('notice').textContent='一部の取得失敗または更新の遅れがあります。最終取得時点の情報を表示しています。';$('notice').hidden=false}
-  }catch(error){$('notice').textContent=['AbortError','TimeoutError'].includes(error.name)?'一覧の取得がタイムアウトしました':error.message;$('notice').hidden=false;if(!state.items.length){$('count').textContent='読み込みに失敗しました';$('grid').innerHTML='<div class="empty">右上の更新ボタンで再度読み込めます。</div>';$('shelf-section').hidden=true}}
-  finally{clearTimeout(timer);state.loading=false;$('refresh').disabled=false}
+    let signal;
+    if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')signal=AbortSignal.timeout(30000);
+    else if(typeof AbortController!=='undefined'){
+      const controller=new AbortController();
+      signal=controller.signal;
+      timer=setTimeout(()=>controller.abort(),30000);
+    }
+    const response=await fetch(url,{cache:'no-cache',...(signal?{signal}:{})});
+    if(!response.ok)throw new Error('一覧を取得できませんでした（HTTP '+response.status+'）');
+    return await response.json();
+  }finally{if(timer!==undefined)clearTimeout(timer)}
+}
+function showCatalog(data,partial){
+  if(!Array.isArray(data?.items))throw new Error('カタログの形式が不正です。');
+  const items=prepareItems(data.items,data.contentPolicy?.excludedItems);
+  const byId=new Map(items.map(x=>[x.id,x]));
+  const category=$('category').value;
+  if(partial&&data.categories!=null&&(!Array.isArray(data.categories)||data.categories.some(x=>typeof x!=='string'))){
+    throw new Error('カタログの形式が不正です。');
+  }
+  const categories=partial?[...(data.categories??[])]:[...new Set(items.filter(isListed).flatMap(x=>x.categories))].sort((a,b)=>a.localeCompare(b,'ja'));
+  if(partial&&category&&!categories.includes(category))categories.push(category);
+  if(partial){
+    for(const id of [state.detailId,state.watch]){
+      if(!byId.has(id)&&state.byId.has(id))byId.set(id,state.byId.get(id));
+    }
+  }
+  const scroll=state.data?window.scrollY:null;
+  initVisit();
+  Object.assign(state,{data,items,byId,partial});
+  $('category').innerHTML='<option value="">すべてのカテゴリ</option>'+categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+  $('category').value=categories.includes(category)?category:'';
+  render();
+  if(scroll!==null&&window.scrollY!==scroll)window.scrollTo({top:scroll,behavior:'instant'});
+  if(partial)$('catalog-info').textContent=catalogInfo(data,items,data.counts??undefined).text;
+  else $('catalog-info').textContent=catalogInfo(state.data,state.items).text;
+  if(state.detailId){
+    const x=byId.get(state.detailId);
+    if(x)$('detail-content').innerHTML=detailMarkup(x);
+    else if(!partial)closeDetails();
+  }
+  if(!partial&&state.watch&&!playable(byId.get(state.watch)||{}))showBrowse();
+  const degraded=(partial?data.errorCount>0:data.errors?.length)||
+    (data.updatedAt&&Date.now()-Date.parse(data.updatedAt)>3*3600000);
+  $('notice').textContent=degraded?'一部の取得失敗または更新の遅れがあります。最終取得時点の情報を表示しています。':'';
+  $('notice').hidden=!degraded;
+  if(!partial){
+    const since=state.visit.baseline;
+    const sinceCount=since===null?0:items.filter(x=>isListed(x)&&isNewSince(x,since)).length;
+    document.querySelectorAll('[data-view="since"]').forEach(button=>{
+      button.hidden=sinceCount===0;
+      button.querySelector('[data-since-count]').textContent=sinceCount.toLocaleString('ja-JP');
+    });
+    try{localStorage.setItem('tm-last-visit',String(Date.now()))}catch{}
+  }
+}
+async function load(){
+  if(state.loading)return;
+  const attempt=state.attempt=(state.attempt??0)+1;
+  state.loading=true;
+  $('refresh').disabled=true;
+  $('notice').hidden=true;
+  let headPromise,headShown=false,fullSucceeded=false;
+  try{
+    if(state.fullFailed){
+      state.fullFailed=false;
+      render();
+    }
+    if(!state.data||state.partial){
+      headPromise=fetchCatalog('data/catalog-head.json').then(head=>{
+        if(attempt!==state.attempt||fullSucceeded||head?.headVersion!==1)return null;
+        showCatalog(head,true);
+        headShown=true;
+        return head;
+      }).catch(()=>null);
+    }
+    const full=await fetchCatalog('data/videos.json');
+    if(attempt!==state.attempt)return;
+    showCatalog(full,false);
+    fullSucceeded=true;
+  }catch(error){
+    if(attempt!==state.attempt)return;
+    if(headPromise&&!headShown)await headPromise;
+    if(attempt!==state.attempt)return;
+    $('notice').hidden=false;
+    if(state.partial){
+      state.fullFailed=true;
+      render();
+      $('notice').textContent='全件の読み込みに失敗しました。一部の作品だけを表示しています。右上の更新ボタンで再読み込みできます。';
+    }else{
+      $('notice').textContent=['AbortError','TimeoutError'].includes(error.name)?'一覧の取得がタイムアウトしました':error.message;
+      if(!state.data){
+        $('count').textContent='読み込みに失敗しました';
+        $('grid').innerHTML='<div class="empty">右上の更新ボタンで再度読み込めます。</div>';
+        $('shelf-section').hidden=true;
+      }
+    }
+  }finally{
+    if(attempt===state.attempt){
+      state.loading=false;
+      $('refresh').disabled=false;
+    }
+  }
 }
 document.addEventListener('click',event=>{
   const view=event.target.closest('[data-view]');if(view){setView(view.dataset.view);return}
@@ -118,7 +228,7 @@ $('q').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTi
 $('search-form').addEventListener('submit',event=>{event.preventDefault();applySearch()});
 $('category').addEventListener('change',applySearch);
 $('sort').addEventListener('change',()=>{state.view='home';applySearch()});
-$('more').addEventListener('click',()=>{state.limit+=PAGE_SIZE;render({append:true})});
+$('more').addEventListener('click',()=>{if(state.partial&&$('more').hidden)return;state.limit+=PAGE_SIZE;render({append:true})});
 $('refresh').addEventListener('click',load);
 $('all-popular').addEventListener('click',()=>setView('popular'));
 $('menu-toggle').addEventListener('click',()=>setMenu(!$('sidebar').classList.contains('open')));

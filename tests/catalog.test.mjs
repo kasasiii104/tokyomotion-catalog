@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { classifyTitle, filterJapanese, LANGUAGE_POLICY_VERSION } from '../assets/language.mjs';
-import { PAGE_SIZE, escapeHTML, stats, safeUrl, prepareItems, selectItems } from '../assets/catalog-core.mjs';
+import { PAGE_SIZE, escapeHTML, stats, safeUrl, prepareItems, isListed, selectItems, catalogInfo, firstSeenMs, visitBaseline, isNewSince } from '../assets/catalog-core.mjs';
 import { PreviewController, previewSpec } from '../assets/preview-controller.mjs';
 import { auditContent, contentExclusionReasons } from '../assets/content-filter.mjs';
-import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, mergeItems, detailQueue, updateCatalog, pruneCatalog, assessRun, validateForSave, runMain } from '../scripts/update.mjs';
+import { SOURCE, RSS_URL, SCHEMA_VERSION, RATING_VERSION, PREVIEW_VERSION, decode, stripMarkup, parseFeed, parseListing, parseDetail, parseThumbnailPreview, migrateItems, migrateLifecycle, migrateFirstSeen, expireNotFound, mergeItems, detailQueue, detailQueuePlan, updateCatalog, pruneCatalog, assessRun, validateForSave, buildHead, runMain } from '../scripts/update.mjs';
 
 const NOW=Date.parse('2026-10-04T10:00:00Z');
 const url=id=>`${SOURCE}/video/${id}/test`;
@@ -184,6 +184,48 @@ test('search, favorites, history and missing-date ordering use the full catalog'
   assert.equal(selectItems([a,b,c],{query:'作品 2'}).length,1);
 });
 
+test('public catalog views hide unavailable works',()=>{
+  const items=[
+    item(1),
+    {...item(2),availability:'embed_available'},
+    {...item(3),availability:'not_found'},
+    {...item(4),availability:'unavailable'},
+  ].map(x=>({...x,categories:['テスト']}));
+  const filters=[
+    ...['home','recent','popular','rated','archive','unknown'].map(view=>({view})),
+    {query:'テスト作品'},
+    {category:'テスト'},
+  ];
+  for(const options of filters){
+    assert.deepEqual(selectItems(items,options).map(x=>x.id).sort(),['video:1','video:2'],JSON.stringify(options));
+  }
+});
+test('favorites and history retain unavailable works',()=>{
+  const items=[{...item(1),availability:'not_found'},{...item(2),availability:'unavailable'}];
+  const ids=items.map(x=>x.id);
+  assert.deepEqual(selectItems(items,{view:'favorites',favorites:new Set(ids)}).map(x=>x.id).sort(),ids);
+  assert.deepEqual(selectItems(items,{view:'history',history:ids}).map(x=>x.id),ids);
+});
+test('popular shelf starts with a listed work when the most viewed work is not found',()=>{
+  const items=[
+    {...item(1),availability:'not_found',views:1000},
+    {...item(2),availability:'embed_available',views:10},
+    {...item(3),views:5},
+  ];
+  assert.equal(selectItems(items,{view:'popular'})[0].id,'video:2');
+});
+test('a retained work reappears when its embed becomes available',()=>{
+  const items=prepareItems([{...item(1),availability:'not_found'}]);
+  assert.deepEqual(selectItems(items),[]);
+  assert.equal(items.length,1);
+  items[0].availability='embed_available';
+  assert.deepEqual(selectItems(items).map(x=>x.id),['video:1']);
+});
+test('app category options are built from listed works',async()=>{
+  const script=await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8');
+  assert.match(script,/categories=.*items\.filter\(isListed\)\.flatMap\(x=>x\.categories\)/);
+});
+
 const previewData={type:'images',source:'official_thumbnail_rotation',baseUrl:'https://cdn.tokyo-motion.net/media/videos/tmb75/1/',count:20};
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function controllerHarness(load=async url=>url){
@@ -263,7 +305,7 @@ async function uiHarness(){
   const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]));
   const nodes=new Map(),events={};const get=id=>{assert.ok(ids.has(id),`Missing DOM element: ${id}`);if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id)};get('sort').value='new';
   class TestController extends PreviewController{constructor(){super({load:async()=>{},schedule:()=>1,cancel(){}})}}
-  const ctx=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],addEventListener:(key,fn)=>events[key]=fn},window:{scrollY:123,scrollTo(){},addEventListener(){}},localStorage:{getItem:()=>'{invalid',setItem(){}},URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},PAGE_SIZE,esc:escapeHTML,safeUrl,stats,prepareItems,selectItems,PreviewController:TestController,previewSpec});
+  const ctx=vm.createContext({document:{getElementById:get,createElement:tag=>new Element(tag),querySelectorAll:()=>[],addEventListener:(key,fn)=>events[key]=fn},window:{scrollY:123,scrollTo(){},addEventListener(){}},localStorage:{getItem:()=>'{invalid',setItem(){}},sessionStorage:{getItem:()=>null,setItem(){}},URL,Map,Set,Date,setTimeout:()=>1,clearTimeout(){},PAGE_SIZE,esc:escapeHTML,safeUrl,stats,prepareItems,isListed,selectItems,catalogInfo,visitBaseline,isNewSince,PreviewController:TestController,previewSpec});
   const script=(await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'').replace(/load\(\);\s*$/,'');vm.runInContext(script,ctx);
   const samples=[{...item(1),image:previewData.baseUrl+'default.jpg',preview:previewData,embedUrl:`${SOURCE}/embed/example1`,statsVersion:2,views:1234,likes:12,dislikes:3},{...item(2),preview:{...previewData,baseUrl:previewData.baseUrl.replace('/1/','/2/')},embedUrl:`${SOURCE}/embed/example2`}];ctx.samples=samples;vm.runInContext('state.items=samples;state.byId=new Map(samples.map(x=>[x.id,x]));',ctx);
   function makeCard(id){const card=new Element('article');card.dataset.id='video:'+id;card.dataset.card='grid:video:'+id;card.media=new Element();card.button=new Element('button');card.button.image=new Element('img');card.button.image.src=previewData.baseUrl+'default.jpg';card.button.indicator=new Element();card.append(card.media);return card}
@@ -400,16 +442,24 @@ test('load revalidates the stable catalog URL with a timeout and supports older 
 });
 test('load falls back to AbortController and clears its timer after success or timeout',async()=>{
   for(const support of ['missing timeout','missing AbortSignal'])for(const timeout of [false,true]){
-    const {ctx,nodes}=await uiHarness();vm.runInContext('render()',ctx);
+    const {ctx,nodes}=await uiHarness();vm.runInContext('showCatalog({items:samples},false)',ctx);
     const previous=vm.runInContext('({data:state.data,items:state.items,byId:state.byId})',ctx),html=nodes.get('grid').innerHTML;
-    const signal={aborted:false},timer={};let fire,duration,cleared,request,abort;
+    const signal={aborted:false},timer={};let fire,duration,cleared,request,abort,complete;
     if(support==='missing timeout')ctx.AbortSignal={};
     ctx.AbortController=class{constructor(){this.signal=signal}abort(){signal.aborted=true;abort?.()}};
     ctx.setTimeout=(fn,ms)=>{fire=fn;duration=ms;return timer};ctx.clearTimeout=id=>{cleared=id};
-    ctx.fetch=(url,options)=>{request={url,options};return timeout?new Promise((resolve,reject)=>{abort=()=>{const error=new Error('aborted');error.name='AbortError';reject(error)}}):Promise.resolve({ok:true,json:async()=>({items:[item(1)]})})};
+    // Hold the refresh response until loading is asserted.
+    ctx.fetch=(url,options)=>{
+      request={url,options};
+      return new Promise((resolve,reject)=>{
+        abort=()=>{const error=new Error('aborted');error.name='AbortError';reject(error)};
+        complete=()=>resolve({ok:true,json:async()=>({items:[item(1)]})});
+      });
+    };
     const pending=vm.runInContext('load()',ctx);
+    await tick();
     assert.equal(request.options.signal,signal);assert.equal(duration,30000);assert.equal(nodes.get('refresh').disabled,true);
-    if(timeout){fire();assert.equal(signal.aborted,true)}
+    if(timeout){fire();assert.equal(signal.aborted,true)}else complete();
     await pending;
     assert.equal(cleared,timer);assert.equal(nodes.get('refresh').disabled,false);assert.equal(vm.runInContext('state.loading',ctx),false);
     if(timeout){
@@ -420,7 +470,7 @@ test('load falls back to AbortController and clears its timer after success or t
 });
 test('load preserves all catalog state and previews when category preparation fails',async()=>{
   const {ctx,nodes,makeCard}=await uiHarness();ctx.firstCard=makeCard(1);
-  vm.runInContext('render();togglePreview(firstCard)',ctx);await tick();
+  vm.runInContext('showCatalog({items:samples},false);togglePreview(firstCard)',ctx);await tick();
   const previous=vm.runInContext('({data:state.data,items:state.items,byId:state.byId,active:previews.active})',ctx),html=nodes.get('grid').innerHTML;
   ctx.fetch=async()=>({ok:true,json:async()=>({items:[{...item(3),categories:['test',42]}]})});
   await vm.runInContext('load()',ctx);
@@ -430,7 +480,7 @@ test('load preserves all catalog state and previews when category preparation fa
 });
 test('load preserves the old catalog and restores refresh after AbortError or TimeoutError',async()=>{
   for(const name of ['AbortError','TimeoutError']){
-    const {ctx,nodes}=await uiHarness();vm.runInContext('render()',ctx);
+    const {ctx,nodes}=await uiHarness();vm.runInContext('showCatalog({items:samples},false)',ctx);
     const previous=vm.runInContext('({data:state.data,items:state.items,byId:state.byId})',ctx),html=nodes.get('grid').innerHTML;
     ctx.fetch=async()=>{const error=new Error('aborted');error.name=name;throw error};
     await vm.runInContext('load()',ctx);
@@ -586,6 +636,78 @@ test('detail backoff expires exponentially with a seven day cap and preserves qu
   const refresh=items.map(x=>({...x,detailCheckedAt:new Date(NOW-(Number(x.videoId)+48)*3600000).toISOString()}));
   assert.deepEqual(detailQueue(refresh,NOW+168*3600000).map(x=>x.videoId),['1','8','7','9']);
 });
+const queueHour=3600000;
+const checkedQueueItem=(id,hours,fields={})=>({
+  ...item(id),detailCheckedAt:new Date(NOW-hours*queueHour).toISOString(),
+  statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,...fields,
+});
+
+test('popular details prioritize the top twelve and honor listing and age filters',()=>{
+  const ranked=Array.from({length:13},(_,i)=>checkedQueueItem(i+1,i===12?5:4,{views:100-i}));
+  ranked[0].detailCheckedAt=new Date(NOW-3*queueHour).toISOString();
+  const hidden=checkedQueueItem(14,6,{views:1000,availability:'not_found'});
+  const nonnumeric=checkedQueueItem(15,6,{views:'1000'});
+  const {queue,detailLanes}=detailQueuePlan([hidden,nonnumeric,...ranked],NOW);
+  assert.deepEqual(queue,[...ranked.slice(1,12),ranked[12]]);
+  assert.deepEqual(detailLanes,{pending:0,popular:12,fresh:0,rotation:0});
+  const hotOnly=detailQueuePlan(ranked,NOW,240,{popularPool:12});
+  assert.deepEqual(hotOnly.queue,ranked.slice(1,12));
+});
+
+test('fresh details require publication within seven days and a check over six hours old',()=>{
+  const fresh=checkedQueueItem(1,7,{date:NOW-7*24*queueHour});
+  const recentCheck=checkedQueueItem(2,6,{date:fresh.date});
+  const oldRelease=checkedQueueItem(3,7,{date:fresh.date-1});
+  const futureRelease=checkedQueueItem(4,7,{date:NOW+1});
+  const unavailable=checkedQueueItem(5,7,{date:fresh.date,availability:'unavailable'});
+  const {queue,detailLanes}=detailQueuePlan([recentCheck,oldRelease,futureRelease,unavailable,fresh],NOW);
+  assert.equal(detailLanes.fresh,1);
+  assert.equal(queue[0],fresh);
+});
+
+test('five hundred pending details leave reserved slots for popular, fresh and rotation',()=>{
+  const pending=Array.from({length:500},(_,i)=>item(i+1));
+  const popular=Array.from({length:36},(_,i)=>checkedQueueItem(501+i,4,{views:100-i}));
+  const fresh=Array.from({length:24},(_,i)=>checkedQueueItem(537+i,7,{date:NOW-3*24*queueHour}));
+  const rotation=Array.from({length:60},(_,i)=>checkedQueueItem(561+i,25,{availability:'not_found'}));
+  const {queue,detailLanes}=detailQueuePlan([...pending,...popular,...fresh,...rotation],NOW,240);
+  assert.equal(queue.length,240);
+  assert.deepEqual(detailLanes,{pending:120,popular:36,fresh:24,rotation:60});
+});
+
+test('unused detail slots roll forward without duplicate video IDs or exceeding the limit',()=>{
+  const popular=checkedQueueItem(2,30,{views:100,date:NOW-7*24*queueHour});
+  const pending=checkedQueueItem(1,30,{previewVersion:0});
+  const rotation=Array.from({length:20},(_,i)=>checkedQueueItem(3+i,25));
+  const items=[pending,popular,{...popular},...rotation];
+  const {queue,detailLanes}=detailQueuePlan(items,NOW,8);
+  assert.deepEqual(detailLanes,{pending:1,popular:1,fresh:0,rotation:6});
+  assert.equal(new Set(queue.map(x=>x.videoId)).size,8);
+  assert.equal(queue.length,8);
+  assert.deepEqual(detailQueue(items,NOW,0),[]);
+});
+
+test('an unparsable detailCheckedAt is re-queued as pending instead of dropping out of every lane',()=>{
+  // Astra final check: with current versions and an invalid timestamp, no lane selected the work.
+  for(const offset of [0,24*queueHour,365*24*queueHour]){
+    const plan=detailQueuePlan([checkedQueueItem(1,0,{detailCheckedAt:'invalid',views:100,date:NOW})],NOW+offset,1);
+    assert.deepEqual(plan.queue.map(x=>x.videoId),['1']);
+    assert.equal(plan.detailLanes.pending,1);
+  }
+});
+test('detail backoff excludes candidates from every lane',()=>{
+  const backoff={detailFailures:2,detailAttemptAt:new Date(NOW-queueHour).toISOString()};
+  const items=[
+    {...item(1),...backoff},
+    checkedQueueItem(2,4,{views:100,...backoff}),
+    checkedQueueItem(3,7,{date:NOW-7*24*queueHour,...backoff}),
+    checkedQueueItem(4,25,{availability:'not_found',...backoff}),
+  ];
+  assert.deepEqual(detailQueuePlan(items,NOW),{
+    queue:[],detailLanes:{pending:0,popular:0,fresh:0,rotation:0},
+  });
+});
+
 test('listing and RSS merges preserve detail failure bookkeeping',()=>{
   const old={...item(1),detailFailures:3,detailAttemptAt:new Date(NOW).toISOString()};
   const [merged]=mergeItems([old],parseListing(listing(1,0),SOURCE,NOW).items,parseFeed(rss(1)));
@@ -762,4 +884,601 @@ test('newestSeenId: RSSとbackfillだけの大きいIDでは進まずbackfill失
   const options={now:NOW,recentPages:1,maxRecentPages:1,delayMs:0,backfillPages:1,previewAuditPages:0,detailLimit:0};
   const first=await updateCatalog({items:[item(100)],newestSeenId:100},{...options,getText:async u=>u===RSS_URL?rss(400):listing(u===SOURCE?100:500,3)});assert.equal(first.newestSeenId,100);
   const second=await updateCatalog(first,{...options,getText:async u=>{if(u===RSS_URL)return rss(400);if(u===SOURCE)return listing(200,2);throw Object.assign(Error('HTTP_403'),{status:403})}});assert.equal(second.newestSeenId,200);
+});
+
+test('catalogInfo formats the update in Japan time and counts listed items',()=>{
+  const data={updatedAt:'2026-11-18T02:51:27Z'};
+  const items=[{}, {availability:'not_found'}, {availability:'unavailable'}, {}];
+  const info=catalogInfo(data,items);
+  assert.match(info.updatedText,/2026\/11\/18 11:51/);
+  assert.equal(info.listed,2);
+  assert.equal(info.total,4);
+  assert.equal(info.text,`最終更新 ${info.updatedText}（日本時間） · 収録 2件（削除・非公開を除く。総数 4件）`);
+  assert.equal(catalogInfo(data,[{}]).text,`最終更新 ${info.updatedText}（日本時間） · 収録 1件`);
+});
+
+test('catalogInfo shows 未更新 for missing or invalid timestamps',()=>{
+  for(const data of [{},{updatedAt:null},{updatedAt:'invalid'}]){
+    const info=catalogInfo(data,[]);
+    assert.equal(info.updatedText,'未更新');
+    assert.equal(info.text,'最終更新 未更新（日本時間） · 収録 0件');
+  }
+});
+
+test('catalogInfo prefers supplied numeric counts',()=>{
+  const info=catalogInfo({},[{}],{listed:1234,total:5678});
+  assert.equal(info.listed,1234);
+  assert.equal(info.total,5678);
+  assert.match(info.text,/収録 1,234件（削除・非公開を除く。総数 5,678件）/);
+  assert.equal(catalogInfo({},[{}],{listed:0}).listed,0);
+  assert.equal(catalogInfo({},[{}],{total:5}).listed,1);
+});
+
+test('UI places catalog info below the chips and updates it with catalogInfo',async()=>{
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  const script=await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8');
+  assert.match(html,/<nav class="chips"[^>]*>[^\n]*<\/nav>\s*<p id="catalog-info" class="catalog-info" aria-live="polite">読み込み中…<\/p>\s*<div id="notice"/);
+  assert.match(script,/\$\('catalog-info'\)\.textContent\s*=\s*catalogInfo\(state\.data,\s*state\.items\)\.text/);
+});
+
+const LIFECYCLE_DAY=86400000;
+const lifecycleDate=days=>new Date(NOW+days*LIFECYCLE_DAY).toISOString();
+
+test('migrateLifecycle initializes only timestamps supported by legacy detail results',()=>{
+  for(const [availability,field] of [['not_found','notFoundSince'],['embed_available','detailOkAt'],['unavailable','detailOkAt']]){
+    const legacy={availability,detailCheckedAt:lifecycleDate(-3)};
+    const migrated=migrateLifecycle(legacy);
+    assert.deepEqual(migrated,{...legacy,[field]:legacy.detailCheckedAt});
+    assert.strictEqual(migrateLifecycle(migrated),migrated);
+    const existing={...legacy,[field]:lifecycleDate(-5)};
+    assert.strictEqual(migrateLifecycle(existing),existing);
+    for(const old of [{availability},{availability,detailCheckedAt:'invalid'}]){
+      assert.strictEqual(migrateLifecycle(old),old);
+    }
+  }
+  const unchecked={detailCheckedAt:lifecycleDate(-3)};
+  assert.strictEqual(migrateLifecycle(unchecked),unchecked);
+});
+
+test('expireNotFound requires elapsed time and two distant 404s without intervening success',()=>{
+  const eligible={availability:'not_found',notFoundSince:lifecycleDate(-31),detailCheckedAt:lifecycleDate(-1)};
+  const kept=[
+    {...eligible,detailCheckedAt:eligible.notFoundSince},
+    {...eligible,notFoundSince:lifecycleDate(-29),detailCheckedAt:lifecycleDate(0)},
+    {...eligible,notFoundSince:lifecycleDate(-30),detailCheckedAt:lifecycleDate(0)},
+    {...eligible,detailOkAt:lifecycleDate(-31)},
+    {...eligible,detailOkAt:lifecycleDate(-30)},
+    {...eligible,notFoundSince:'invalid'},
+    {...eligible,detailCheckedAt:'invalid'},
+    ...['unavailable','embed_available',undefined].map(availability=>({...eligible,availability})),
+  ];
+  const earlierSuccess={...eligible,detailOkAt:lifecycleDate(-32)};
+  assert.deepEqual(expireNotFound([eligible,...kept,earlierSuccess],NOW),{kept,removed:[eligible,earlierSuccess]});
+  assert.deepEqual(expireNotFound([eligible],NOW,{days:31}),{kept:[eligible],removed:[]});
+});
+
+function lifecycleUpdate(previous,days,status,detailLimit=1) {
+  return updateCatalog(previous,{
+    getText:async u=>{
+      if(u===RSS_URL)return rss(1);
+      if(!u.includes('/video/'))return listing(1,0);
+      if(status!==200)throw Object.assign(Error(`HTTP_${status}`),{status});
+      return detail(1);
+    },
+    now:NOW+days*LIFECYCLE_DAY,delayMs:0,recentPages:1,backfillPages:0,previewAuditPages:0,detailLimit,
+  });
+}
+
+test('updateCatalog tracks first and repeated 404s and preserves lifecycle dates on other failures',async()=>{
+  const previous={items:[{...item(1),availability:'embed_available',statsVersion:SCHEMA_VERSION,detailCheckedAt:lifecycleDate(-2)}]};
+  const first=await lifecycleUpdate(previous,0,404);
+  assert.equal(first.items[0].availability,'not_found');
+  assert.equal(first.items[0].notFoundSince,lifecycleDate(0));
+  assert.equal(first.items[0].detailOkAt,lifecycleDate(-2));
+  const second=await lifecycleUpdate(first,2,404);
+  assert.equal(second.items[0].notFoundSince,lifecycleDate(0));
+  assert.equal(second.items[0].detailCheckedAt,lifecycleDate(2));
+  const failed=await lifecycleUpdate(second,4,500);
+  assert.equal(failed.items[0].detailFailures,1);
+  assert.equal(failed.items[0].notFoundSince,lifecycleDate(0));
+  assert.equal(failed.items[0].detailOkAt,lifecycleDate(-2));
+  assert.equal(failed.items[0].detailCheckedAt,lifecycleDate(2));
+});
+
+test('updateCatalog expires old 404 items and accumulates removal counts',async()=>{
+  const previous={items:[{...item(1),availability:'not_found',statsVersion:SCHEMA_VERSION,detailCheckedAt:lifecycleDate(-31)}],
+    notFoundPolicy:{removedTotal:4}};
+  const result=await lifecycleUpdate(previous,0,404);
+  assert.deepEqual(result.items,[]);
+  assert.equal(result.summary.expiredNotFound,1);
+  assert.deepEqual(result.notFoundPolicy,{days:30,removedThisRun:1,removedTotal:5,lastRemoval:{at:lifecycleDate(0),count:1},expired:[{videoId:'1',at:lifecycleDate(0)}]});
+  const next=await lifecycleUpdate(result,1,200,0);
+  assert.equal(next.summary.expiredNotFound,0);
+  assert.deepEqual(next.notFoundPolicy,{...result.notFoundPolicy,removedThisRun:0,expired:[]});
+  assert.deepEqual(pruneCatalog(result,NOW).notFoundPolicy,result.notFoundPolicy);
+});
+
+test('updateCatalog rechecks rediscovered expired works before listing them',async()=>{
+  const previous={items:[{...item(1),availability:'not_found',statsVersion:SCHEMA_VERSION,detailCheckedAt:lifecycleDate(-31)}]};
+  const expired=await lifecycleUpdate(previous,0,404);
+  assert.deepEqual(expired.notFoundPolicy.expired,[{videoId:'1',at:lifecycleDate(0)}]);
+
+  const revived=await lifecycleUpdate(expired,1,404,0);
+  assert.equal(revived.summary.revivedFromExpired,1);
+  assert.deepEqual(revived.notFoundPolicy.expired,[]);
+  assert.equal(revived.items[0].availability,'not_found');
+  assert.equal(revived.items[0].notFoundSince,lifecycleDate(1));
+  assert.equal(revived.items[0].firstSeenAt,lifecycleDate(1));
+  assert.equal(Object.hasOwn(revived.items[0],'detailCheckedAt'),false);
+  assert.deepEqual(selectItems(revived.items,{view:'home'}),[]);
+
+  const stillMissing=await lifecycleUpdate(revived,2,404);
+  assert.equal(stillMissing.summary.detailLanes.pending,1);
+  assert.equal(stillMissing.items[0].notFoundSince,lifecycleDate(1));
+  assert.deepEqual(selectItems(stillMissing.items,{view:'home'}),[]);
+
+  const recovered=await lifecycleUpdate(stillMissing,4,200);
+  assert.equal(recovered.items[0].availability,'embed_available');
+  assert.equal(Object.hasOwn(recovered.items[0],'notFoundSince'),false);
+  assert.deepEqual(selectItems(recovered.items,{view:'home'}),recovered.items);
+});
+
+test('updateCatalog drops expired markers older than 180 days and deduplicates the rest',async()=>{
+  const previous={notFoundPolicy:{expired:[
+    {videoId:'1',at:lifecycleDate(-181)},
+    {videoId:'2',at:lifecycleDate(-180)},
+    {videoId:'3',at:lifecycleDate(-10),title:'余分なタイトル'},
+    {videoId:'3',at:lifecycleDate(-11)},
+  ]}};
+  const result=await lifecycleUpdate(previous,0,404,0);
+  assert.deepEqual(result.notFoundPolicy.expired,[
+    {videoId:'2',at:lifecycleDate(-180)},
+    {videoId:'3',at:lifecycleDate(-10)},
+  ]);
+  assert.equal(result.summary.revivedFromExpired,0);
+  assert.equal(selectItems(result.items,{view:'home'}).length,1);
+});
+
+test('updateCatalog clears notFoundSince when an expirable item recovers',async()=>{
+  const previous={items:[{...item(1),availability:'not_found',statsVersion:SCHEMA_VERSION,
+    notFoundSince:lifecycleDate(-33),detailCheckedAt:lifecycleDate(-2)}]};
+  assert.equal(expireNotFound(previous.items,NOW).removed.length,1);
+  const result=await lifecycleUpdate(previous,0,200);
+  assert.equal(result.items[0].availability,'embed_available');
+  assert.equal(result.items[0].detailOkAt,lifecycleDate(0));
+  assert.equal(Object.hasOwn(result.items[0],'notFoundSince'),false);
+  assert.equal(result.summary.expiredNotFound,0);
+});
+
+test('migrateFirstSeen initializes from valid dates and preserves existing timestamps',()=>{
+  const dated={date:NOW-1000};
+  const migrated=migrateFirstSeen(dated,NOW);
+  assert.deepEqual(migrated,{...dated,firstSeenAt:new Date(dated.date).toISOString()});
+  assert.equal(migrateFirstSeen({date:NOW+1000},NOW).firstSeenAt,new Date(NOW).toISOString());
+  for(const invalid of [{},{date:0},{date:-1},{date:Infinity},{date:NaN},{date:String(NOW)}]){
+    assert.equal(Object.hasOwn(migrateFirstSeen(invalid,NOW),'firstSeenAt'),false);
+  }
+  const existing={date:NOW,firstSeenAt:migrated.firstSeenAt};
+  assert.equal(migrateFirstSeen(existing,NOW),existing);
+  assert.equal(migrateFirstSeen(migrated,NOW+1000),migrated);
+});
+
+test('updateCatalog stamps new items and preserves firstSeenAt through listing and detail refreshes',async()=>{
+  const firstSeenAt=new Date(NOW-86400000).toISOString();
+  const existing={...item(1),firstSeenAt};
+  assert.equal(mergeItems([existing],[item(1)])[0].firstSeenAt,firstSeenAt);
+  const detailRequests=[];
+  const result=await updateCatalog({items:[existing]},{
+    now:NOW,delayMs:0,recentPages:1,backfillPages:0,previewAuditPages:0,
+    getText:async source=>{
+      if(source===RSS_URL)return rss(2);
+      if(source===SOURCE)return listing(1,0);
+      detailRequests.push(source);
+      return detail(source===url(1)?1:2);
+    },
+  });
+  assert.deepEqual(new Set(detailRequests),new Set([url(1),url(2)]));
+  assert.equal(result.items.find(x=>x.videoId==='1').firstSeenAt,firstSeenAt);
+  assert.equal(result.items.find(x=>x.videoId==='2').firstSeenAt,new Date(NOW).toISOString());
+});
+
+test('visitBaseline anchors each tab to the previous visit and ignores invalid timestamps',()=>{
+  const last=String(NOW-2000),session=String(NOW-4000);
+  assert.deepEqual(visitBaseline({},NOW),{baseline:null,session:'none',last:String(NOW)});
+  assert.deepEqual(visitBaseline({last},NOW),{baseline:Number(last),session:last,last:String(NOW)});
+  assert.deepEqual(visitBaseline({last,session},NOW),{baseline:Number(session),session,last:String(NOW)});
+  assert.equal(visitBaseline({last,session:'none'},NOW).baseline,null);
+  for(const invalid of ['',' ','invalid','Infinity']){
+    assert.equal(visitBaseline({last:invalid},NOW).baseline,null);
+    assert.equal(visitBaseline({last,session:invalid},NOW).baseline,null);
+  }
+});
+
+test('since view lists only newly seen listed items in the usual newest-first order',()=>{
+  const seen=(id,offset,fields={})=>({...item(id),firstSeenAt:new Date(NOW+offset).toISOString(),...fields});
+  const items=[
+    seen(1,2000,{date:NOW-2000}),seen(2,1000,{date:NOW-1000}),seen(3,0),seen(4,-1),
+    seen(5,1000,{availability:'not_found'}),seen(6,1000,{availability:'unavailable'}),item(7),
+  ];
+  assert.deepEqual(selectItems(items,{view:'since',since:NOW,sort:'old'}).map(x=>x.videoId),['2','1']);
+  assert.deepEqual(selectItems(items,{view:'since',since:null}),[]);
+});
+
+test('firstSeenMs and isNewSince require a valid timestamp after the baseline',()=>{
+  const seen={firstSeenAt:new Date(NOW).toISOString()};
+  assert.equal(firstSeenMs(seen),NOW);
+  assert.equal(isNewSince(seen,NOW-1),true);
+  assert.equal(isNewSince(seen,NOW),false);
+  assert.equal(isNewSince(seen,null),false);
+  assert.equal(isNewSince(seen,String(NOW-1)),false);
+  for(const invalid of [{},{firstSeenAt:'invalid'},{firstSeenAt:NOW}]){
+    assert.equal(Number.isNaN(firstSeenMs(invalid)),true);
+    assert.equal(isNewSince(invalid,NOW),false);
+  }
+});
+
+test('UI includes since navigation in both menus and renders the NEW badge on shared cards',async()=>{
+  const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+  const script=await readFile(new URL('../assets/app.mjs',import.meta.url),'utf8');
+  for(const style of ['nav-item','chip']){
+    assert.ok(html.includes(`<button data-view="since" class="${style}" hidden>前回からの新着<span class="since-count" data-since-count>`));
+  }
+  assert.match(script,/function card.*isNewSince\(x,state\.visit\?\.baseline\).*class="new-badge">NEW/);
+  assert.match(script,/since:'前回からの新着'/);
+  assert.match(script,/\[data-view="since"\]/);
+});
+
+test('updateCatalog defaults to 320 detail requests when the pending lane is empty',async()=>{
+  const detailCheckedAt=new Date(NOW-48*3600000).toISOString();
+  const previous={schemaVersion:SCHEMA_VERSION,items:Array.from({length:321},(_,i)=>({
+    ...item(i+1),statsVersion:SCHEMA_VERSION,ratingVersion:RATING_VERSION,previewVersion:PREVIEW_VERSION,detailCheckedAt,
+  }))};
+  const requests=[];
+  const result=await updateCatalog(previous,{
+    now:NOW,delayMs:0,recentPages:1,maxRecentPages:1,backfillPages:0,previewAuditPages:0,
+    getText:async source=>{
+      if(source===RSS_URL)return rss(1);
+      if(source===SOURCE)return listing(1,0);
+      requests.push(source);
+      return detail(Number(source.match(/\/video\/(\d+)/)[1]));
+    },
+  });
+  assert.equal(result.collection.detailLimit,320);
+  assert.equal(result.summary.detailLanes.pending,0);
+  assert.equal(result.summary.detailAttempted,320);
+  assert.equal(new Set(requests).size,320);
+});
+
+test('buildHead selects and projects the listed catalog with counts and categories',()=>{
+  const updatedAt=new Date(NOW).toISOString(),day=86400000;
+  const items=[
+    {...item(1),date:5,views:80,categories:['猫'],tags:['タグ'],detailFailures:1},
+    {...item(2),date:4,views:100,ratingPercent:75,categories:['犬','猫']},
+    {...item(3),date:3,ratingPercent:95,firstSeenAt:new Date(NOW-day).toISOString()},
+    {...item(4),date:2,firstSeenAt:new Date(NOW-3*day).toISOString()},
+    {...item(5),date:1,firstSeenAt:new Date(NOW-4*day).toISOString(),categories:['鳥']},
+    {...item(6),date:10,views:200,ratingPercent:100,availability:'not_found',categories:['非公開']},
+    {...item(7),date:11,views:300,ratingPercent:100,availability:'unavailable',categories:['削除']},
+    {...item(8),date:0,firstSeenAt:new Date(NOW+day).toISOString()}
+  ];
+  const catalog={updatedAt,source:SOURCE,backfill:{nextPage:7},items,errors:[{stage:'detail'}]};
+  const options={newCount:1,popularCount:1,ratedCount:1};
+  const head=buildHead(catalog,options),ids=head.items.map(x=>x.id);
+  assert.deepEqual(ids,[...selectItems(items).slice(0,3).map(x=>x.id),'video:4']);
+  for(const sort of ['new','views','rating']){
+    assert.equal(selectItems(head.items,{sort})[0].id,selectItems(items,{sort})[0].id);
+  }
+  assert.deepEqual(buildHead(catalog,{...options,sinceMax:1}).items.map(x=>x.id),ids.slice(0,3));
+  const tied=[{...item(10),date:1,views:100,ratingPercent:95},items[2],items[1]];
+  const tiedHead=buildHead({...catalog,items:tied},options);
+  for(const sort of ['views','rating']){
+    assert.equal(selectItems(tiedHead.items,{sort})[0].id,selectItems(tied,{sort})[0].id);
+  }
+  assert.deepEqual(head.items[0],{...item(1),date:5,views:80,categories:['猫'],tags:['タグ']});
+  assert.deepEqual(head,{headVersion:1,updatedAt,source:SOURCE,backfill:catalog.backfill,errorCount:1,
+    counts:{total:8,listed:6},categories:['犬','鳥','猫'].sort((a,b)=>a.localeCompare(b,'ja')),
+    full:'data/videos.json',items:head.items});
+});
+
+test('runMain creates both catalog files on first run and regenerates the head on prune-only',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'catalog-head-'));
+  try{
+    const output=join(dir,'videos.json'),result={schemaVersion:SCHEMA_VERSION,items:[item(1)]};
+    await assert.rejects(readFile(output),{code:'ENOENT'});
+    for(const argv of [[],['--prune-only']]){
+      await rm(join(dir,'catalog-head.json'),{force:true});
+      assert.equal(await runMain({argv,output,update:async()=>result,log:()=>{},env:{}}),0);
+      const saved=JSON.parse(await readFile(output,'utf8'));
+      assert.deepEqual(saved.items,result.items);
+      assert.equal(await readFile(join(dir,'catalog-head.json'),'utf8'),JSON.stringify(buildHead(saved))+'\n');
+    }
+  }finally{await rm(dir,{recursive:true,force:true})}
+});
+
+test('runMain returns 1 when catalog head rename fails after saving the full catalog',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'catalog-head-fail-'));
+  try{
+    const output=join(dir,'videos.json'),result={schemaVersion:SCHEMA_VERSION,items:[item(1)]},logs=[];
+    await mkdir(join(dir,'catalog-head.json'));
+    // The workflow must stop before committing catalog files from different runs.
+    assert.equal(await runMain({argv:[],output,update:async()=>result,log:x=>logs.push(x),env:{}}),1);
+    assert.deepEqual(JSON.parse(await readFile(output,'utf8')),result);
+    assert.ok(logs.some(x=>x.startsWith('::error title=Catalog head not written::')));
+  }finally{await rm(dir,{recursive:true,force:true})}
+});
+
+test('runMain replaces a stale head with a disabled marker when head generation throws',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'catalog-head-disabled-'));
+  try{
+    const output=join(dir,'videos.json'),head=join(dir,'catalog-head.json'),logs=[];
+    const result={schemaVersion:SCHEMA_VERSION,updatedAt:lifecycleDate(0),items:[{...item(1),categories:[1,2]}]};
+    await writeFile(head,JSON.stringify(buildHead({updatedAt:lifecycleDate(-1),items:[item(2)]})));
+    assert.throws(()=>buildHead(result));
+    assert.equal(await runMain({argv:[],output,update:async()=>result,log:x=>logs.push(x),env:{}}),0);
+    assert.deepEqual(JSON.parse(await readFile(output,'utf8')),result);
+    assert.deepEqual(JSON.parse(await readFile(head,'utf8')),{headVersion:0,updatedAt:result.updatedAt});
+    assert.ok(logs.some(x=>x.startsWith('::warning title=Catalog head not built::')));
+  }finally{await rm(dir,{recursive:true,force:true})}
+});
+
+test('load renders head then full catalog and preserves browse state and the visit baseline',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  const items=[{...item(1),categories:['犬']},{...item(2),categories:['犬']}];
+  const head={...buildHead({items:items.slice(0,1)}),categories:['犬','猫'],counts:{total:100,listed:90}};
+  const requests=[];
+  let resolveFull,visits=0;
+  ctx.localStorage.setItem=key=>{if(key==='tm-last-visit')visits++};
+  ctx.fetch=(url,options)=>{
+    requests.push(url);
+    assert.equal(options.cache,'no-cache');
+    if(url==='data/catalog-head.json')return Promise.resolve({ok:true,json:async()=>head});
+    return new Promise(resolve=>{resolveFull=resolve});
+  };
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  assert.deepEqual(requests,['data/catalog-head.json','data/videos.json']);
+  assert.match(nodes.get('grid').innerHTML,/grid:video:1/);
+  assert.doesNotMatch(nodes.get('grid').innerHTML,/grid:video:2/);
+  assert.match(nodes.get('catalog-info').textContent,/90件.*100件/);
+  assert.match(nodes.get('category').innerHTML,/猫/);
+  assert.equal(nodes.get('refresh').disabled,true);
+  assert.equal(nodes.get('more').hidden,true);
+  assert.equal(nodes.get('count').textContent,'先読み 1件を表示中 · 全件を読み込み中…');
+  assert.equal(visits,0);
+  const limit=vm.runInContext('state.limit',ctx);
+  nodes.get('more').listeners.click();
+  assert.equal(vm.runInContext('state.limit',ctx),limit);
+  vm.runInContext("setView('recent');state.limit=42",ctx);
+  nodes.get('q').value='テスト';
+  nodes.get('category').value='犬';
+  nodes.get('sort').value='rating';
+  vm.runInContext('render()',ctx);
+  let restored;
+  ctx.window.scrollTo=options=>{restored=options.top};
+  const grid=nodes.get('grid'),replace=grid.replaceChildren.bind(grid);
+  grid.replaceChildren=(...children)=>{ctx.window.scrollY=0;replace(...children)};
+  resolveFull({ok:true,json:async()=>({items})});
+  await pending;
+  assert.equal(restored,123);
+  assert.equal(vm.runInContext('state.partial',ctx),false);
+  assert.equal(vm.runInContext('state.view',ctx),'recent');
+  assert.equal(vm.runInContext('state.limit',ctx),42);
+  assert.equal(nodes.get('q').value,'テスト');
+  assert.equal(nodes.get('category').value,'犬');
+  assert.equal(nodes.get('sort').value,'rating');
+  assert.match(grid.innerHTML,/grid:video:2/);
+  assert.equal(visits,1);
+  assert.equal(nodes.get('refresh').disabled,false);
+});
+
+test('load silently falls back to the full catalog for a missing or invalid head',async()=>{
+  for(const response of [{ok:false,status:404},{ok:true,json:async()=>{throw new SyntaxError()}},
+    {ok:true,json:async()=>({headVersion:1,items:null})},{ok:true,json:async()=>({headVersion:0})}]){
+    const {ctx,nodes}=await uiHarness();
+    const requests=[];
+    ctx.fetch=async url=>{
+      requests.push(url);
+      return url==='data/catalog-head.json'?response:{ok:true,json:async()=>({items:[item(2)]})};
+    };
+    await vm.runInContext('load()',ctx);
+    assert.deepEqual(requests,['data/catalog-head.json','data/videos.json']);
+    assert.equal(vm.runInContext('state.partial',ctx),false);
+    assert.match(nodes.get('grid').innerHTML,/grid:video:2/);
+    assert.equal(nodes.get('notice').hidden,true);
+  }
+});
+
+test('load keeps the head and shows the full catalog failure notice',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  let resolveFull;
+  ctx.fetch=url=>url==='data/catalog-head.json'
+    ?Promise.resolve({ok:true,json:async()=>buildHead({items:[item(1)],errors:[{}]})})
+    :new Promise(resolve=>{resolveFull=resolve});
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  resolveFull({ok:false,status:503});
+  await pending;
+  assert.equal(vm.runInContext('state.partial',ctx),true);
+  assert.match(nodes.get('grid').innerHTML,/grid:video:1/);
+  assert.equal(nodes.get('notice').hidden,false);
+  assert.match(nodes.get('notice').textContent,/全件の読み込みに失敗しました。一部の作品だけを表示しています。/);
+  assert.equal(nodes.get('refresh').disabled,false);
+  const message='全件の読み込みに失敗しました。右上の更新ボタンで再読み込みできます。';
+  for(const action of ["setView('archive')","setView('favorites')","setView('history')",
+    "setView('home');$('q').value='テスト';render()","setView('home');$('category').value='犬';render()",
+    "setView('home');$('sort').value='old';render()","setView('home');$('sort').value='title';render()"]){
+    vm.runInContext(action,ctx);
+    assert.equal(nodes.get('grid').innerHTML,`<div class="empty">${message}</div>`);
+    assert.equal(nodes.get('count').textContent,message);
+  }
+  const retry=vm.runInContext('load()',ctx);
+  await tick();
+  assert.equal(nodes.get('count').textContent,'全件を読み込み中…');
+  resolveFull({ok:true,json:async()=>({items:[item(2)]})});
+  await retry;
+  assert.match(nodes.get('grid').innerHTML,/grid:video:2/);
+  assert.equal(vm.runInContext('state.fullFailed',ctx),false);
+});
+
+test('load shows a late head and failure messages after the full catalog returns 503',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  let resolveHead;
+  ctx.fetch=url=>url==='data/catalog-head.json'
+    ?new Promise(resolve=>{resolveHead=resolve})
+    :Promise.resolve({ok:false,status:503});
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  assert.equal(vm.runInContext('state.loading',ctx),true);
+  assert.equal(nodes.get('refresh').disabled,true);
+  resolveHead({ok:true,json:async()=>buildHead({items:[item(1)]})});
+  await pending;
+  assert.match(nodes.get('grid').innerHTML,/grid:video:1/);
+  assert.equal(nodes.get('notice').hidden,false);
+  assert.equal(nodes.get('notice').textContent,'全件の読み込みに失敗しました。一部の作品だけを表示しています。右上の更新ボタンで再読み込みできます。');
+  assert.equal(vm.runInContext('state.fullFailed',ctx),true);
+  assert.equal(vm.runInContext('state.loading',ctx),false);
+  assert.equal(nodes.get('refresh').disabled,false);
+  vm.runInContext("setView('archive')",ctx);
+  const message='全件の読み込みに失敗しました。右上の更新ボタンで再読み込みできます。';
+  assert.equal(nodes.get('grid').innerHTML,`<div class="empty">${message}</div>`);
+  assert.equal(nodes.get('count').textContent,message);
+});
+
+test('load shows the retry prompt when the full catalog returns 503 before the head returns 404',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  let resolveHead;
+  ctx.fetch=url=>url==='data/catalog-head.json'
+    ?new Promise(resolve=>{resolveHead=resolve})
+    :Promise.resolve({ok:false,status:503});
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  assert.equal(nodes.get('refresh').disabled,true);
+  resolveHead({ok:false,status:404});
+  await pending;
+  assert.equal(nodes.get('notice').hidden,false);
+  assert.match(nodes.get('notice').textContent,/HTTP 503/);
+  assert.equal(nodes.get('count').textContent,'読み込みに失敗しました');
+  assert.equal(nodes.get('grid').innerHTML,'<div class="empty">右上の更新ボタンで再度読み込めます。</div>');
+  assert.equal(nodes.get('shelf-section').hidden,true);
+  assert.equal(vm.runInContext('state.loading',ctx),false);
+  assert.equal(nodes.get('refresh').disabled,false);
+});
+
+test('refresh ignores a head from the previous load arriving during the new load',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  let resolveHead,resolveFull;
+  ctx.fetch=url=>{
+    if(url==='data/catalog-head.json')return new Promise(resolve=>{resolveHead=resolve});
+    return new Promise(resolve=>{resolveFull=resolve});
+  };
+  const pending=vm.runInContext('load()',ctx);
+  resolveFull({ok:true,json:async()=>({items:[item(2)]})});
+  await pending;
+  const grid=nodes.get('grid'),firstMarkup=grid.innerHTML;
+  assert.match(firstMarkup,/grid:video:2/);
+  const refresh=nodes.get('refresh').listeners.click();
+  assert.equal(nodes.get('refresh').disabled,true);
+  resolveHead({ok:true,json:async()=>buildHead({items:[item(1)]})});
+  await tick();
+  assert.equal(grid.innerHTML,firstMarkup);
+  assert.equal(vm.runInContext('state.partial',ctx),false);
+  resolveFull({ok:true,json:async()=>({items:[item(3)]})});
+  await refresh;
+  assert.match(grid.innerHTML,/grid:video:3/);
+});
+
+test('partial catalog waits for the full list in archive and search',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  let resolveFull;
+  ctx.fetch=url=>url==='data/catalog-head.json'
+    ?Promise.resolve({ok:true,json:async()=>buildHead({items:[item(1)],errors:[{}]})})
+    :new Promise(resolve=>{resolveFull=resolve});
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  assert.match(nodes.get('notice').textContent,/一部の取得失敗または更新の遅れ/);
+  for(const action of ["setView('archive')","setView('home');$('q').value='テスト';render()"]){
+    vm.runInContext(action,ctx);
+    assert.match(nodes.get('grid').innerHTML,/全件を読み込み中です…/);
+    assert.equal(nodes.get('count').textContent,'全件を読み込み中…');
+    assert.equal(nodes.get('more').hidden,true);
+  }
+  resolveFull({ok:true,json:async()=>({items:[item(2)]})});
+  await pending;
+  assert.match(nodes.get('grid').innerHTML,/grid:video:2/);
+});
+
+test('load starts both requests immediately and ignores a head arriving after the full catalog',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  const requests=new Map();
+  ctx.fetch=url=>new Promise(resolve=>requests.set(url,resolve));
+  const pending=vm.runInContext('load()',ctx);
+  assert.ok(requests.has('data/catalog-head.json'));
+  assert.ok(requests.has('data/videos.json'));
+  requests.get('data/videos.json')({ok:true,json:async()=>({items:[item(2)]})});
+  await pending;
+  const grid=nodes.get('grid');
+  assert.match(grid.innerHTML,/grid:video:2/);
+  const fullMarkup=grid.innerHTML;
+  requests.get('data/catalog-head.json')({ok:true,json:async()=>buildHead({items:[item(1)]})});
+  await tick();
+  assert.equal(grid.innerHTML,fullMarkup);
+  assert.equal(vm.runInContext('state.partial',ctx),false);
+});
+
+test('refresh requests only the full catalog and retains the current full view on failure',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  ctx.fetch=async url=>url==='data/catalog-head.json'
+    ?{ok:false,status:404}
+    :{ok:true,json:async()=>({items:[]})};
+  await vm.runInContext('load()',ctx);
+  const fullMarkup=nodes.get('grid').innerHTML,fullCount=nodes.get('count').textContent;
+  const requests=[];
+  ctx.fetch=async url=>{
+    requests.push(url);
+    return {ok:false,status:503};
+  };
+  await nodes.get('refresh').listeners.click();
+  assert.deepEqual(requests,['data/videos.json']);
+  assert.equal(nodes.get('grid').innerHTML,fullMarkup);
+  assert.equal(nodes.get('count').textContent,fullCount);
+  assert.equal(vm.runInContext('state.partial',ctx),false);
+  assert.equal(nodes.get('notice').hidden,false);
+  assert.match(nodes.get('notice').textContent,/HTTP 503/);
+});
+
+test('load finalizes new-since controls only with full data and records every successful full visit',async()=>{
+  const {ctx,nodes}=await uiHarness();
+  const badge={textContent:''},button={hidden:true,querySelector:()=>badge};
+  ctx.document.querySelectorAll=selector=>selector==='[data-view="since"]'?[button]:[];
+  const local=new Map([['tm-last-visit',String(NOW-1000)]]),session=new Map();
+  ctx.localStorage={getItem:key=>local.get(key),setItem:(key,value)=>local.set(key,value)};
+  ctx.sessionStorage={getItem:key=>session.get(key),setItem:(key,value)=>session.set(key,value)};
+  let now=NOW;
+  ctx.Date=class extends Date{static now(){return now}};
+  const items=[{...item(1),firstSeenAt:new Date(NOW-500).toISOString()},
+    {...item(2),firstSeenAt:new Date(NOW-250).toISOString()}];
+  let resolveFull;
+  ctx.fetch=url=>url==='data/catalog-head.json'
+    ?Promise.resolve({ok:true,json:async()=>buildHead({items:items.slice(0,1)})})
+    :new Promise(resolve=>{resolveFull=resolve});
+  const pending=vm.runInContext('load()',ctx);
+  await tick();
+  assert.equal(nodes.get('count').textContent,'先読み 1件を表示中 · 全件を読み込み中…');
+  assert.equal(button.hidden,true);
+  assert.equal(badge.textContent,'');
+  assert.equal(local.get('tm-last-visit'),String(NOW-1000));
+  now+=1000;
+  resolveFull({ok:true,json:async()=>({items})});
+  await pending;
+  assert.equal(button.hidden,false);
+  assert.equal(badge.textContent,'2');
+  assert.equal(local.get('tm-last-visit'),String(now));
+  now+=1000;
+  const refresh=nodes.get('refresh').listeners.click();
+  resolveFull({ok:true,json:async()=>({items})});
+  await refresh;
+  assert.equal(local.get('tm-last-visit'),String(now));
+  assert.equal(session.get('tm-visit-baseline'),String(NOW-1000));
+  assert.equal(vm.runInContext('state.visit.baseline',ctx),NOW-1000);
+  assert.equal(badge.textContent,'2');
 });
