@@ -7,6 +7,7 @@
 # 未完了 deployment の有無を確認する（本件での原因は未確定）。
 # M4③: 状況を確認したうえで workflow_dispatch（Run workflow）で再実行する。
 # L6（TM-02）: Actions は SHA で固定（行末コメントが版）。更新は .github/dependabot.yml の PR で受け取る。
+# tm-catalog-improvement: update 側の paths に合わせて assets/catalog-core.mjs を paths-ignore に追加。
 name: Deploy TokyoMotion catalog
 
 on:
@@ -19,6 +20,7 @@ on:
       - 'tests/**'
       - 'assets/language.mjs'
       - 'assets/content-filter.mjs'
+      - 'assets/catalog-core.mjs'
       - '.github/workflows/update-catalog.yml'
   workflow_dispatch:
   workflow_run:
